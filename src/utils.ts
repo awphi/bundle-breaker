@@ -4,7 +4,7 @@ import type {
   AnyFunctionExpression,
   Bundle,
   WebpackModuleMapExpression,
-} from "./types.js";
+} from "./types";
 import * as recast from "recast";
 
 import r = recast.types.namedTypes;

@@ -4,7 +4,6 @@
   "description": "Unbundle a bundled webpack project into separate files.",
   "main": "dist/index.js",
   "bin": "dist/index.js",
-  "type": "module",
   "files": [
     "dist/"
   ],
@@ -16,7 +15,7 @@
     "deobsfuscator"
   ],
   "scripts": {
-    "dev": "tsc -w",
+    "dev": "esbuild src/index.ts --bundle --platform=node --packages=external --outdir=dist --watch",
     "prepack": "tsc"
   },
   "author": "awphi (adamw.ph)",
@@ -27,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "20.11.0",
+    "esbuild": "^0.20.2",
     "typescript": "^5.4.2"
   }
 }
