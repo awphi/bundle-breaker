@@ -1,10 +1,5 @@
-import type {
-  ArrowFunctionExpression,
-  FunctionExpression,
-  Literal,
-  ObjectExpression,
-  Property,
-} from "acorn";
+import * as recast from "recast";
+import r = recast.types.namedTypes;
 
 export interface Chunk {
   code: string;
@@ -18,16 +13,24 @@ export interface Bundle {
   entry: string;
 }
 
-export interface WebpackModuleMapProperty extends Property {
-  key: Literal & { raw: string };
-  value: ArrowFunctionExpression | FunctionExpression;
+export type AnyFunctionExpression =
+  | r.ArrowFunctionExpression
+  | r.FunctionExpression;
+
+export interface WebpackModuleMapProperty
+  extends recast.types.namedTypes.Property {
+  key: r.Literal & { value: number };
+  value: AnyFunctionExpression;
 }
 
-export interface WebpackModuleMapExpression extends ObjectExpression {
+export interface WebpackModuleMapExpression extends r.ObjectExpression {
   properties: Array<WebpackModuleMapProperty>;
 }
 
 export type ModuleFnMap = Record<
   string,
-  FunctionExpression | ArrowFunctionExpression
+  {
+    fn: AnyFunctionExpression;
+    name: string;
+  }
 >;

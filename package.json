@@ -22,10 +22,7 @@
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",
   "dependencies": {
-    "acorn": "^8.11.3",
-    "acorn-walk": "^8.3.2",
     "commander": "^12.0.0",
-    "escodegen": "^2.1.0",
     "recast": "^0.23.6"
   },
   "devDependencies": {

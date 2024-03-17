@@ -52,13 +52,16 @@ for (const file of fileNames) {
   }
 
   for (const prop of maps[0].properties) {
-    if (prop.key.raw in moduleMap) {
-      console.warn(
-        `Encountered collision on module ID '${prop.key.raw}'. Skipping...`
-      );
+    const key = prop.key.value.toString();
+    if (key in moduleMap) {
+      console.warn(`Encountered collision on module ID '${key}'. Skipping...`);
       continue;
     }
-    moduleMap[prop.key.raw] = prop.value;
+    moduleMap[key] = {
+      fn: prop.value,
+      // TODO something more advanced for naming modules
+      name: key,
+    };
   }
 }
 

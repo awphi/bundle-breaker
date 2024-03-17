@@ -1,28 +1,97 @@
 import path from "path";
 import fs from "fs/promises";
-import { generate } from "escodegen";
 import type {
+  AnyFunctionExpression,
   Bundle,
   ModuleFnMap,
   WebpackModuleMapExpression,
 } from "./types.js";
-import {
-  parse,
-  type BlockStatement,
-  type CallExpression,
-  type FunctionExpression,
-  type Identifier,
-  type Program,
-} from "acorn";
-// TODO maybe use recast for ast parsing/generation to make codemods easier
-import * as walk from "acorn-walk";
-import {
-  astNodeContains,
-  iifefyWebpackModuleFn,
-  isIIFE,
-  isSingleExpressionProgram,
-  isWebpackModuleMap,
-} from "./codemods.js";
+import * as recast from "recast";
+
+import r = recast.types.namedTypes;
+const n = recast.types.namedTypes;
+const b = recast.types.builders;
+
+export function isAnyFunctionExpression(
+  node: r.ASTNode
+): node is AnyFunctionExpression {
+  return (
+    n.FunctionExpression.check(node) || n.ArrowFunctionExpression.check(node)
+  );
+}
+
+export function isIIFE(node: r.ASTNode): node is r.ExpressionStatement {
+  if (n.ExpressionStatement.check(node)) {
+    if (n.UnaryExpression.check(node.expression)) {
+      return isIIFE(node.expression.argument);
+    } else if (n.CallExpression.check(node.expression)) {
+      return isIIFE(node.expression);
+    } else {
+      return false;
+    }
+  }
+
+  return (
+    n.CallExpression.check(node) &&
+    isAnyFunctionExpression(node.callee) &&
+    node.callee.id == null
+  );
+}
+
+export function isSingleExpressionProgram(body: r.Statement[]): boolean {
+  if (body.length === 1) {
+    return true;
+  }
+
+  if (body.length === 2) {
+    const first = body[0];
+    if ("directive" in first) {
+      return (
+        typeof first.directive === "string" && first.directive === "use strict"
+      );
+    }
+  }
+
+  return false;
+}
+
+export function isWebpackModuleMap(
+  node: r.ObjectExpression
+): node is WebpackModuleMapExpression {
+  return (
+    node.properties.length > 0 &&
+    node.properties.every((prop) => {
+      return (
+        n.Property.check(prop) &&
+        n.Literal.check(prop.key) &&
+        typeof prop.key.value === "number" &&
+        isAnyFunctionExpression(prop.value) &&
+        prop.value.params.length <= 3
+      );
+    })
+  );
+}
+
+// walks a program looking for objects that look like webpack module maps (objects that map numerical keys to functions)
+// internal module maps shouldn't break it as we only take distinct top-level maps
+export function getWebpackModuleMaps(
+  program: any
+): WebpackModuleMapExpression[] {
+  const result: WebpackModuleMapExpression[] = [];
+  recast.visit(program, {
+    visitObjectExpression(path) {
+      const node = path.node;
+      if (isWebpackModuleMap(node)) {
+        result.push(node);
+        return false;
+      }
+
+      this.traverse(path);
+    },
+  });
+
+  return [...result];
+}
 
 /**
  * Format bytes as human-readable text.
@@ -67,7 +136,7 @@ function findEntry(files: Bundle["files"]): string {
     const { ast } = files[file];
 
     try {
-      const body = getEntryBody(file, ast);
+      const body = getEntryBody(file, ast.program);
       if (isSingleExpressionProgram(body)) {
         maybeEntry.delete(file);
       }
@@ -144,9 +213,7 @@ export async function makeBundle(
         const code = content.toString();
         files[name] = {
           code,
-          ast: parse(code, {
-            ecmaVersion: "latest",
-          }),
+          ast: recast.parse(code),
         };
         size += content.byteLength;
       })
@@ -170,55 +237,19 @@ export async function makeBundle(
 }
 
 // unwraps the entry body from an IIFE if present
-export function getEntryBody(
-  fileName: string,
-  ast: Program
-): Program | BlockStatement {
+export function getEntryBody(fileName: string, ast: r.Program): r.Statement[] {
   if (ast.body.length === 1) {
     const iife = ast.body[0];
     if (isIIFE(iife)) {
-      const fn = iife.expression as CallExpression;
-      return (fn.callee as FunctionExpression).body;
+      const fn = iife.expression as r.CallExpression;
+      const { body } = fn.callee as AnyFunctionExpression;
+      return n.BlockStatement.check(body) ? body.body : [body];
     } else {
       throw new Error(`Failed to parse entry file '${fileName}'.`);
     }
   } else {
-    return ast;
+    return ast.body;
   }
-}
-
-// walks a program looking for objects that look like webpack module maps (objects that map numerical keys to functions)
-// internal module maps shouldn't break it as we only take distinct top-level maps
-export function getWebpackModuleMaps(
-  program: Program
-): WebpackModuleMapExpression[] {
-  const result = new Set<WebpackModuleMapExpression>();
-  walk.simple(program, {
-    ObjectExpression: (node) => {
-      if (isWebpackModuleMap(node)) {
-        for (const existing of result) {
-          // check if we've already got this one covered
-          if (astNodeContains(existing, node)) {
-            return;
-          }
-
-          // check if this one covers any ones we've already got
-          if (astNodeContains(node, existing)) {
-            result.delete(existing);
-          }
-        }
-
-        result.add(node);
-      }
-    },
-  });
-
-  return [...result];
-}
-
-function makeModuleFileName(moduleMap: ModuleFnMap, id: string): string {
-  // TODO something more advanced
-  return `${id}.js`;
 }
 
 // codemod the webpack module functions and write to disk
@@ -228,16 +259,22 @@ export async function writeModulesDirectory(
 ): Promise<void> {
   const moduleIds = Object.keys(moduleMap);
   const promises: Promise<void>[] = [];
+
   for (const moduleId of moduleIds) {
-    const moduleFn = structuredClone(moduleMap[moduleId]);
+    const { fn, name } = moduleMap[moduleId];
+    const moduleFn = structuredClone(fn);
+    // TODO codemods:
+    // 1. Wrap in IIFE as we did before and invoke with the same parameters webpack usually would
+    // 2. Rewrite parameters of the require function in the if block below to use the name given in the moduleMap
+
     if (moduleFn.params.length >= 3) {
-      const requireFnName = (moduleFn.params[2] as Identifier).name;
-      // TODO rename arguments in usage of the import function to their new file names instead of raw numbers
+      const requireFnName = (moduleFn.params[2] as r.Identifier).name;
     }
 
-    const fileName = makeModuleFileName(moduleMap, moduleId);
-    const outputCode = generate(iifefyWebpackModuleFn(moduleFn));
-    promises.push(fs.writeFile(path.join(outDir, fileName), outputCode));
+    const outputCode = recast.prettyPrint(moduleFn, {
+      reuseWhitespace: false,
+    }).code;
+    promises.push(fs.writeFile(path.join(outDir, `${name}.js`), outputCode));
   }
 }
 
