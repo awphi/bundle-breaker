@@ -11,30 +11,6 @@ import r = recast.types.namedTypes;
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
 
-const requireProgramCode = `var __webpack_module_cache__ = {};
-  
-function __webpack_require__(e) {
-  var t = __webpack_module_cache__[e];
-  if (void 0 !== t) return t.exports;
-  var r = (__webpack_module_cache__[e] = {
-    id: e,
-    loaded: !1,
-    exports: {},
-  });
-  return (
-    require(__webpack_modules__[e]).call(
-      r.exports,
-      r,
-      r.exports,
-      __webpack_require__
-    ),
-    (r.loaded = !0),
-    r.exports
-  );
-}
-
-module.exports = __webpack_require__;`;
-
 export function isAnyFunctionExpression(
   node: r.ASTNode
 ): node is AnyFunctionExpression {
