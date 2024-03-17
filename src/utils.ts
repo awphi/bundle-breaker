@@ -3,7 +3,6 @@ import fs from "fs/promises";
 import type {
   AnyFunctionExpression,
   Bundle,
-  ModuleFnMap,
   WebpackModuleMapExpression,
 } from "./types.js";
 import * as recast from "recast";
@@ -11,6 +10,30 @@ import * as recast from "recast";
 import r = recast.types.namedTypes;
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
+
+const requireProgramCode = `var __webpack_module_cache__ = {};
+  
+function __webpack_require__(e) {
+  var t = __webpack_module_cache__[e];
+  if (void 0 !== t) return t.exports;
+  var r = (__webpack_module_cache__[e] = {
+    id: e,
+    loaded: !1,
+    exports: {},
+  });
+  return (
+    require(__webpack_modules__[e]).call(
+      r.exports,
+      r,
+      r.exports,
+      __webpack_require__
+    ),
+    (r.loaded = !0),
+    r.exports
+  );
+}
+
+module.exports = __webpack_require__;`;
 
 export function isAnyFunctionExpression(
   node: r.ASTNode
@@ -74,9 +97,7 @@ export function isWebpackModuleMap(
 
 // walks a program looking for objects that look like webpack module maps (objects that map numerical keys to functions)
 // internal module maps shouldn't break it as we only take distinct top-level maps
-export function getWebpackModuleMaps(
-  program: any
-): WebpackModuleMapExpression[] {
+function getWebpackModuleMaps(program: any): WebpackModuleMapExpression[] {
   const result: WebpackModuleMapExpression[] = [];
   recast.visit(program, {
     visitObjectExpression(path) {
@@ -130,10 +151,9 @@ export function formatBytes(bytes: number, si = false, dp = 1): string {
 
 // auto-detection of entry file given a set of chunks via process of eliminiation
 function findEntry(files: Bundle["files"]): string {
-  const fileNames = Object.keys(files);
-  const maybeEntry = new Set(fileNames);
-  for (const file of fileNames) {
-    const { ast } = files[file];
+  const maybeEntry = new Set(files.keys());
+  for (const file of files.keys()) {
+    const { ast } = files.get(file)!;
 
     try {
       const body = getEntryBody(file, ast.program);
@@ -204,17 +224,17 @@ export async function makeBundle(
     throw new Error(`Directory '${dir}' is empty.`);
   }
 
-  const files: Bundle["files"] = {};
+  const files: Bundle["files"] = new Map();
   let size: number = 0;
 
   await Promise.all(
     fileNames.map((name) =>
       fs.readFile(path.join(dir, name)).then((content) => {
         const code = content.toString();
-        files[name] = {
+        files.set(name, {
           code,
           ast: recast.parse(code),
-        };
+        });
         size += content.byteLength;
       })
     )
@@ -222,7 +242,7 @@ export async function makeBundle(
 
   const entry = entryIn ?? findEntry(files);
 
-  if (!(entry in files)) {
+  if (!files.has(entry)) {
     throw new Error(
       `Entry file '${entry}' does not exist in directory '${dir}'.`
     );
@@ -233,6 +253,7 @@ export async function makeBundle(
     files,
     size,
     entry,
+    modules: getModules(files),
   };
 }
 
@@ -254,36 +275,121 @@ export function getEntryBody(fileName: string, ast: r.Program): r.Statement[] {
 
 // codemod the webpack module functions and write to disk
 export async function writeModulesDirectory(
-  moduleMap: ModuleFnMap,
-  outDir: string
+  bundle: Bundle,
+  outDir: string,
+  ext: string
 ): Promise<void> {
-  const moduleIds = Object.keys(moduleMap);
   const promises: Promise<void>[] = [];
 
-  for (const moduleId of moduleIds) {
-    const { fn, name } = moduleMap[moduleId];
-    const moduleFn = structuredClone(fn);
-    // TODO codemods:
-    // 1. Wrap in IIFE as we did before and invoke with the same parameters webpack usually would
-    // 2. Rewrite parameters of the require function in the if block below to use the name given in the moduleMap
+  const moduleExportsExpr = b.memberExpression(
+    b.identifier("module"),
+    b.identifier("exports")
+  );
 
-    if (moduleFn.params.length >= 3) {
-      const requireFnName = (moduleFn.params[2] as r.Identifier).name;
-    }
+  for (const moduleId of bundle.modules.keys()) {
+    const { fn, name } = bundle.modules.get(moduleId)!;
 
-    const outputCode = recast.prettyPrint(moduleFn, {
-      reuseWhitespace: false,
+    const moduleProgram = b.program([
+      b.expressionStatement(b.assignmentExpression("=", moduleExportsExpr, fn)),
+    ]);
+
+    const outputCode = recast.prettyPrint(moduleProgram, {
+      tabWidth: 2,
     }).code;
-    promises.push(fs.writeFile(path.join(outDir, `${name}.js`), outputCode));
+    promises.push(
+      fs.writeFile(path.join(outDir, `${name}.${ext}`), outputCode)
+    );
   }
 }
 
 export async function writeEntry(
   bundle: Bundle,
-  outDir: string
+  outDir: string,
+  ext: string
 ): Promise<void> {
-  await fs.writeFile(
-    path.join(outDir, "index.js"),
-    "// TODO entry codemodding"
+  const { ast } = bundle.files.get(bundle.entry)!;
+  // TODO in the entry AST - find the main __webpack_require__ function (it should be the only thing that indexes into the module map)
+
+  // we should have asserted there is only one module map in the entry file earlier
+  const [moduleMap] = getWebpackModuleMaps(ast) as r.ObjectExpression[];
+
+  moduleMap.properties = [...bundle.modules.keys()].map((key) =>
+    b.property(
+      "init",
+      b.literal(key),
+      b.literal(`./modules/${bundle.modules.get(key)!.name}.${ext}`)
+    )
   );
+
+  let foundWebpackRequireFn = false;
+
+  recast.visit(ast, {
+    visitMemberExpression(path) {
+      const node = path.node;
+      if (n.Identifier.check(node.object) && node.computed) {
+        const scope = path.scope.lookup(node.object.name);
+        if (scope) {
+          const bindings = scope.getBindings()[node.object.name];
+          if (
+            bindings.length === 1 &&
+            bindings[0].parentPath.node.init === moduleMap
+          ) {
+            if (foundWebpackRequireFn) {
+              throw new Error(
+                "Found multiple potential __webpack_require__ functions."
+              );
+            }
+            path.replace(b.callExpression(b.identifier("require"), [node]));
+            foundWebpackRequireFn = true;
+            return false;
+          }
+        }
+      }
+      this.traverse(path);
+    },
+  });
+
+  if (!foundWebpackRequireFn) {
+    throw new Error("Failed to locate __webpack_require__ function.");
+  }
+
+  await fs.writeFile(
+    path.join(outDir, `index.${ext}`),
+    recast.prettyPrint(ast.program, { tabWidth: 2 }).code
+  );
+}
+
+function getModules(files: Bundle["files"]): Bundle["modules"] {
+  const modules: Bundle["modules"] = new Map();
+  for (const file of files.keys()) {
+    const { ast } = files.get(file)!;
+    const maps = getWebpackModuleMaps(ast);
+    if (maps.length === 0) {
+      console.warn(
+        `Failed to detect any webpack module maps in file '${file}'. Skipping...`
+      );
+      continue;
+    } else if (maps.length > 1) {
+      throw new Error(
+        `Detected more than one webpack module map in file '${file}'. This is likely a bug.`
+      );
+    }
+
+    for (const prop of maps[0].properties) {
+      const key = prop.key.value;
+      if (key in modules) {
+        console.warn(
+          `Encountered collision on module ID '${key}'. Skipping...`
+        );
+        continue;
+      }
+      modules.set(key, {
+        fn: prop.value,
+        // TODO something more advanced for naming modules
+        name: key.toString(),
+      });
+    }
+  }
+
+  return modules;
 }

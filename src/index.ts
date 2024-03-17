@@ -3,12 +3,10 @@ import { program } from "commander";
 import {
   ensureDirectory,
   formatBytes,
-  getWebpackModuleMaps,
-  makeBundle,
+  makeBundle as processBundle,
   writeEntry,
   writeModulesDirectory,
 } from "./utils.js";
-import type { ModuleFnMap } from "./types.js";
 import path from "path";
 
 program
@@ -16,7 +14,8 @@ program
   .argument("<indir>", "Directory containing bundled webpack output")
   .argument("<outdir>", "Directory for the unbundled output of this program")
   .option("-e, --entry <file>", "manually specify an entry file to the bundle")
-  .option("-c, --clear", "clear the output directory before writing");
+  .option("-c, --clear", "clear the output directory before writing", true)
+  .option("-ext, --extension <ext>", "file extension to use for output", "js");
 
 program.parse();
 
@@ -27,45 +26,15 @@ const moduleDirectory = path.join(directoryOut, "modules");
 await ensureDirectory(directoryOut, !!options.clear);
 await ensureDirectory(moduleDirectory, !!options.clear);
 
-const bundle = await makeBundle(directoryIn, options.entry);
-const fileNames = Object.keys(bundle.files);
+const bundle = await processBundle(directoryIn, options.entry);
+const fileNames = [...bundle.files.keys()];
 console.log(`Loaded ${fileNames.length} file(s) from ${bundle.dir}.`);
 console.log(` - Files: ${fileNames.join(", ")}`);
 console.log(
   ` - Entry: ${bundle.entry}` + (options.entry ? "" : " (auto-detected)")
 );
 console.log(` - Total size: ${formatBytes(bundle.size)}`);
+console.log(` - Unique modules: ${bundle.modules.size}`);
 
-const moduleMap: ModuleFnMap = {};
-for (const file of fileNames) {
-  const { ast } = bundle.files[file];
-  const maps = getWebpackModuleMaps(ast);
-  if (maps.length === 0) {
-    console.warn(
-      `Failed to detect any webpack module maps in file '${file}'. Skipping...`
-    );
-    continue;
-  } else if (maps.length > 1) {
-    throw new Error(
-      `Detected more than one webpack module map in file '${file}'. This is likely a bug.`
-    );
-  }
-
-  for (const prop of maps[0].properties) {
-    const key = prop.key.value.toString();
-    if (key in moduleMap) {
-      console.warn(`Encountered collision on module ID '${key}'. Skipping...`);
-      continue;
-    }
-    moduleMap[key] = {
-      fn: prop.value,
-      // TODO something more advanced for naming modules
-      name: key,
-    };
-  }
-}
-
-console.log(` - Unique modules: ${Object.keys(moduleMap).length}`);
-
-await writeModulesDirectory(moduleMap, moduleDirectory);
-await writeEntry(bundle, directoryOut);
+await writeModulesDirectory(bundle, moduleDirectory, options.extension);
+await writeEntry(bundle, directoryOut, options.extension);

@@ -8,9 +8,16 @@ export interface Chunk {
 
 export interface Bundle {
   dir: string;
-  files: Record<string, Chunk>;
+  files: Map<string, Chunk>;
   size: number;
   entry: string;
+  modules: Map<
+    number,
+    {
+      fn: AnyFunctionExpression;
+      name: string;
+    }
+  >;
 }
 
 export type AnyFunctionExpression =
@@ -26,11 +33,3 @@ export interface WebpackModuleMapProperty
 export interface WebpackModuleMapExpression extends r.ObjectExpression {
   properties: Array<WebpackModuleMapProperty>;
 }
-
-export type ModuleFnMap = Record<
-  string,
-  {
-    fn: AnyFunctionExpression;
-    name: string;
-  }
->;
