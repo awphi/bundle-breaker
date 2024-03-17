@@ -1,0 +1,35 @@
+{
+  "name": "webpack-unbundle",
+  "version": "0.1.0",
+  "description": "Unbundle a bundled webpack project into separate files.",
+  "main": "dist/index.js",
+  "bin": "dist/index.js",
+  "type": "module",
+  "files": [
+    "dist/"
+  ],
+  "keywords": [
+    "debundle",
+    "unbundle",
+    "webpack",
+    "deobsfuscate",
+    "deobsfuscator"
+  ],
+  "scripts": {
+    "dev": "tsc -w",
+    "prepack": "tsc"
+  },
+  "author": "awphi (adamw.ph)",
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "acorn": "^8.11.3",
+    "acorn-walk": "^8.3.2",
+    "commander": "^12.0.0",
+    "escodegen": "^2.1.0",
+    "recast": "^0.23.6"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.0",
+    "typescript": "^5.4.2"
+  }
+}
