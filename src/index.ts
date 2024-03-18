@@ -8,7 +8,7 @@ import {
   writeModulesDirectory,
 } from "./utils";
 import path from "path";
-import { version } from "../package.json";
+import { version, description, name } from "../package.json";
 
 const program = new Command();
 
@@ -44,10 +44,7 @@ async function unbundle(
   ]);
 }
 
-program
-  .name("webpack-unbundle")
-  .description("Utilities to reverse-engineer built webpack bundles.")
-  .version(version);
+program.name(name).description(description).version(version);
 
 program
   .command("unbundle")

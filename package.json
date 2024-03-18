@@ -1,7 +1,7 @@
 {
   "name": "webpack-unbundle",
   "version": "0.1.0",
-  "description": "Unbundle a bundled webpack project into separate files.",
+  "description": "Utilities to reverse-engineer built webpack bundles.",
   "main": "dist/index.js",
   "bin": "dist/index.js",
   "files": [
