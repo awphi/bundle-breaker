@@ -1,0 +1,13 @@
+{
+  "name": "@webpack-unbundle/webpack4",
+  "private": true,
+  "scripts": {},
+  "author": "awphi (adamw.ph)",
+  "devDependencies": {
+    "is-even": "^1.0.0",
+    "webpack": "^4.0.0",
+    "webpack-cli": "^4.0.0",
+    "babel-loader": "^8.0.5",
+    "clean-webpack-plugin": "^4.0.0"
+  }
+}
