@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { program } from "commander";
+import { Command } from "commander";
 import {
   ensureDirectory,
   formatBytes,
@@ -8,26 +8,27 @@ import {
   writeModulesDirectory,
 } from "./utils";
 import path from "path";
+import { version } from "../package.json";
 
-program
-  .description("Unbundle a bundled webpack project into separate files.")
-  .argument("<indir>", "Directory containing bundled webpack output")
-  .argument("<outdir>", "Directory for the unbundled output of this program")
-  .option("-e, --entry <file>", "manually specify an entry file to the bundle")
-  .option("-c, --clear", "clear the output directory before writing", true)
-  .option("-ext, --extension <ext>", "file extension to use for output", "js");
+const program = new Command();
 
-program.parse();
+async function unbundle(
+  baseInDir: string,
+  baseOutDir: string,
+  options: any
+): Promise<void> {
+  const inDir = path.resolve(baseInDir);
+  const outDir = path.resolve(baseOutDir);
+  const moduleDir = path.join(outDir, "modules");
 
-async function main(): Promise<void> {
-  const options = program.opts();
-  const [directoryIn, directoryOut] = program.args.map((a) => path.resolve(a));
-  const moduleDirectory = path.join(directoryOut, "modules");
+  await Promise.all([
+    ensureDirectory(inDir, false),
+    ensureDirectory(outDir, !!options.clear).then(() =>
+      ensureDirectory(moduleDir, !!options.clear)
+    ),
+  ]);
 
-  await ensureDirectory(directoryOut, !!options.clear);
-  await ensureDirectory(moduleDirectory, !!options.clear);
-
-  const bundle = await processBundle(directoryIn, options.entry);
+  const bundle = await processBundle(inDir, options.entry);
   const fileNames = [...bundle.files.keys()];
   console.log(`Loaded ${fileNames.length} file(s) from ${bundle.dir}.`);
   console.log(` - Files: ${fileNames.join(", ")}`);
@@ -37,8 +38,25 @@ async function main(): Promise<void> {
   console.log(` - Total size: ${formatBytes(bundle.size)}`);
   console.log(` - Unique modules: ${bundle.modules.size}`);
 
-  await writeModulesDirectory(bundle, moduleDirectory, options.extension);
-  await writeEntry(bundle, directoryOut, options.extension);
+  await Promise.all([
+    writeModulesDirectory(bundle, moduleDir, options.extension),
+    writeEntry(bundle, outDir, options.extension),
+  ]);
 }
 
-main();
+program
+  .name("webpack-unbundle")
+  .description("Utilities to reverse-engineer built webpack bundles.")
+  .version(version);
+
+program
+  .command("unbundle")
+  .description("Unbundle a bundled webpack project into separate files.")
+  .argument("<indir>", "Directory containing bundled webpack output")
+  .argument("<outdir>", "Directory for the unbundled output of this program")
+  .option("-e, --entry <file>", "manually specify an entry file to the bundle")
+  .option("-c, --clear", "clear the output directory before writing", true)
+  .option("-ext, --extension <ext>", "file extension to use for output", "js")
+  .action(unbundle);
+
+program.parse();

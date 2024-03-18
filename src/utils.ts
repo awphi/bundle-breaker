@@ -152,10 +152,9 @@ function findEntry(files: Bundle["files"]): string {
 
 // ensure a directory exists, is a directory and optionall is empty
 export async function ensureDirectory(
-  pthIn: string,
+  pth: string,
   clear: boolean = false
 ): Promise<void> {
-  const pth = path.resolve(pthIn);
   let exists = false;
   try {
     const stat = await fs.lstat(pth);
@@ -184,16 +183,9 @@ export async function ensureDirectory(
 
 // create a bundle object to store ASTs, file paths and sizes
 export async function makeBundle(
-  dirIn: string,
+  dir: string,
   entryIn?: string
 ): Promise<Bundle> {
-  const dir = path.resolve(dirIn);
-  const stat = await fs.lstat(dirIn);
-
-  if (!stat.isDirectory()) {
-    throw new Error(`Could not read directory ${dir}.`);
-  }
-
   const fileNames = await fs.readdir(dir);
 
   if (fileNames.length === 0) {
