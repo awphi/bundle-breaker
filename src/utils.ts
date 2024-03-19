@@ -140,6 +140,11 @@ export async function makeBundle(
   dir: string,
   entryIn?: string
 ): Promise<Bundle> {
+  // TODO split this up better - build the object up in pieces,
+  // - first validate directory/file validity,
+  // - then parse ASTs and ensure all were valid
+  // - then validate the entry exists and contains the require fn, keep a ref to the require fn for later use
+  // - then generate a module map, then done
   const fileNames = await fs.readdir(dir);
 
   if (fileNames.length === 0) {
