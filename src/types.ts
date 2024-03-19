@@ -12,7 +12,7 @@ export interface Bundle {
   size: number;
   entry: string;
   modules: Map<
-    number,
+    string,
     {
       fn: AnyFunctionExpression;
       name: string;
@@ -23,13 +23,3 @@ export interface Bundle {
 export type AnyFunctionExpression =
   | r.ArrowFunctionExpression
   | r.FunctionExpression;
-
-export interface WebpackModuleMapProperty
-  extends recast.types.namedTypes.Property {
-  key: r.Literal & { value: number };
-  value: AnyFunctionExpression;
-}
-
-export interface WebpackModuleMapExpression extends r.ObjectExpression {
-  properties: Array<WebpackModuleMapProperty>;
-}
