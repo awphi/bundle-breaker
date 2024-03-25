@@ -9,6 +9,15 @@
 - [ ] Should be able to re-use the the first part of the logic above (i.e. finding the require fn) to auto-detect the entry file.
 - [ ] Delete the getModuleMaps (or w/e) codescan and instead use the method above for the entry or for additional chunks we should be able to scan the args of the call to .push()
 
+# Test case ideas
+
+Example usage from `/examples/webpack4`: `export NODE_OPTIONS=--openssl-legacy-provider && pnpm webpack -c splitchunks/webpack.config.js`
+
+- [ ] Hashed module IDs plugin
+- [ ] Terser plugin
+- [ ] Chunk splitting
+- [ ] Different values of output.chunkFormat - check if exists in WP4
+
 # Enhancements
 
 - [ ] Make some full examples - include their webpack versions and configs. Use pnpm workspaces.
@@ -18,11 +27,3 @@
 - [ ] Add an extension for module isolation. Maybe have different operations for the script - unbundle, filter (uses eval to prune the module graph)
 - [ ] Add pretty logging when parsing chunks with loading spinners
 - [ ] Add colors for logs?
-
-# Test case ideas
-
-Example usage from `/examples/webpack4`: `export NODE_OPTIONS=--openssl-legacy-provider && pnpm webpack -c splitchunks/webpack.config.js`
-
-- [ ] Hashed module IDs plugin
-- [ ] Terser plugin
-- [ ] Chunk splitting
