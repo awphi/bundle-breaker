@@ -6,18 +6,17 @@ export interface Chunk {
   ast: any;
 }
 
+export interface ModuleFn {
+  fn: AnyFunctionExpression;
+  name: string;
+}
+
 export interface Bundle {
   dir: string;
   files: Map<string, Chunk>;
   size: number;
   entry: string;
-  modules: Map<
-    string,
-    {
-      fn: AnyFunctionExpression;
-      name: string;
-    }
-  >;
+  modules: Map<string, ModuleFn>;
 }
 
 export type AnyFunctionExpression =

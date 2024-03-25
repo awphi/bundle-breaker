@@ -8,6 +8,7 @@
   - [ ] If it's not empty then we're good to go with replacing like we did before in webpack 5 style bundles.
 - [ ] Should be able to re-use the the first part of the logic above (i.e. finding the require fn) to auto-detect the entry file.
 - [ ] Delete the getModuleMaps (or w/e) codescan and instead use the method above for the entry or for additional chunks we should be able to scan the args of the call to .push()
+- [ ] Once the better heuristics are working then make a new internal API - a `Bundle` class with `loadExisting`, `create` static methods and a `saveTo` instance method - this also makes a future JS API wayyy easier
 
 # Test case ideas
 

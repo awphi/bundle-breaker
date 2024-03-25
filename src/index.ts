@@ -3,7 +3,7 @@ import { Command } from "commander";
 import {
   ensureDirectory,
   formatBytes,
-  makeBundle as processBundle,
+  makeBundle,
   writeEntry,
   writeModulesDirectory,
 } from "./utils";
@@ -28,7 +28,7 @@ async function unbundle(
     ),
   ]);
 
-  const bundle = await processBundle(inDir, options.entry);
+  const bundle = await makeBundle(inDir, options.entry);
   const fileNames = [...bundle.files.keys()];
   console.log(`Loaded ${fileNames.length} file(s) from ${bundle.dir}.`);
   console.log(` - Files: ${fileNames.join(", ")}`);
