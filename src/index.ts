@@ -1,14 +1,9 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import {
-  ensureDirectory,
-  formatBytes,
-  makeBundle,
-  writeEntry,
-  writeModulesDirectory,
-} from "./utils";
+import { makeBundle, writeEntry, writeModulesDirectory } from "./unbundle";
 import path from "path";
 import { version, description, name } from "../package.json";
+import { ensureDirectory, formatBytes } from "./utils";
 
 const program = new Command();
 

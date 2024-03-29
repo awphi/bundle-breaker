@@ -22,3 +22,8 @@ export interface Bundle {
 export type AnyFunctionExpression =
   | r.ArrowFunctionExpression
   | r.FunctionExpression;
+
+export interface ModuleMap {
+  modules: Record<string, AnyFunctionExpression>;
+  expr: r.ObjectExpression | r.ArrayExpression | undefined;
+}
