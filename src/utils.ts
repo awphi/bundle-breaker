@@ -110,3 +110,20 @@ export async function ensureDirectory(
     );
   }
 }
+
+export function replaceAstNode(
+  old: r.ASTNode,
+  replacement?: r.ASTNode,
+  ...args: r.ASTNode[]
+): void {
+  recast.visit(old, {
+    visitNode(path) {
+      if (path.node === old) {
+        path.replace(replacement, ...args);
+        return false;
+      }
+
+      this.traverse(path);
+    },
+  });
+}

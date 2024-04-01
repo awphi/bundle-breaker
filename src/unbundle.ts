@@ -2,44 +2,50 @@ import path from "path";
 import fs from "fs/promises";
 import type {
   AnyFunctionExpression,
-  Bundle,
-  ModuleMap,
-  RequireFnInfo,
+  Chunk,
+  WebpackBundle,
+  WebpackModuleMap,
+  WebpackRequireFnInfo,
+  WebpackRuntimeChunkInfo,
 } from "./types";
 import * as recast from "recast";
 
+const recastOpts: recast.Options = { tabWidth: 2 };
+const modulesDirName = "./modules";
+
 import r = recast.types.namedTypes;
-import { ensureDirectory, isIIFE, isSingleExpressionProgram } from "./utils";
+import {
+  ensureDirectory,
+  isIIFE,
+  isSingleExpressionProgram,
+  replaceAstNode,
+} from "./utils";
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
 
-// auto-detection of entry file given a set of chunks via process of eliminiation
-function findEntry(files: Bundle["files"]): string {
-  const maybeEntry = new Set(files.keys());
-  for (const file of files.keys()) {
-    const { ast } = files.get(file)!;
-
+function findRuntimeChunk(
+  chunks: IterableIterator<Chunk>
+): WebpackRuntimeChunkInfo {
+  for (const chunk of chunks) {
     try {
-      findWebpackRequireFn(ast.program, file);
-    } catch (e) {
-      maybeEntry.delete(file);
-    }
+      // attempt to make an object, simply try the next chunk if we get an error
+      const info: WebpackRuntimeChunkInfo = {
+        chunk,
+        requireFn: findWebpackRequireFn(chunk),
+        moduleMap: findEntryModuleMap(chunk),
+      };
+      return info;
+    } catch {}
   }
 
-  if (maybeEntry.size === 1) {
-    return [...maybeEntry][0];
-  }
-
-  throw new Error(
-    "Failed to auto-detect entry file. Try specying one manually with --entry <file>"
-  );
+  throw new Error("Failed to auto-detect entry file.");
 }
 
 // create a bundle object to store ASTs, file paths and sizes
 export async function makeBundle(
   dir: string,
   entryIn?: string
-): Promise<Bundle> {
+): Promise<WebpackBundle> {
   await ensureDirectory(dir, false);
 
   // TODO should use a glob
@@ -49,7 +55,7 @@ export async function makeBundle(
     throw new Error(`Directory '${dir}' is empty.`);
   }
 
-  const files: Bundle["files"] = new Map();
+  const files: WebpackBundle["files"] = new Map();
   let size: number = 0;
 
   await Promise.all(
@@ -60,6 +66,7 @@ export async function makeBundle(
           files.set(name, {
             code,
             ast: recast.parse(code),
+            name: name,
           });
           size += content.byteLength;
         });
@@ -67,25 +74,27 @@ export async function makeBundle(
     })
   );
 
-  // TODO always assert the entry contains a require fn - auto-detected or not
-  const entry = entryIn ?? findEntry(files);
+  const potentitalRuntimeChunks =
+    entryIn && files.has(entryIn)
+      ? [files.get(entryIn)].values()
+      : files.values();
+  const runtimeChunkInfo = findRuntimeChunk(potentitalRuntimeChunks);
 
-  if (!files.has(entry)) {
-    throw new Error(
-      `Entry file '${entry}' does not exist in directory '${dir}'.`
-    );
-  }
-
-  const modules: Bundle["modules"] = new Map();
-  for (const file of files.keys()) {
-    const { ast } = files.get(file)!;
+  const modules: WebpackBundle["modules"] = new Map();
+  for (const { ast, name: fileName } of files.values()) {
     const findModuleMapFn =
-      file === entry ? findEntryModuleMap : findAdditionalChunkModuleMap;
+      fileName === runtimeChunkInfo.chunk.name
+        ? findEntryModuleMap
+        : findAdditionalChunkModuleMap;
     const newModules = Object.entries(findModuleMapFn(ast).modules);
 
     for (const [key, value] of newModules) {
+      if (modules.has(key)) {
+        throw new Error(`Encountered module ID clash '${key}'.`);
+      }
+
       modules.set(key, {
-        name: key.toString(),
+        name: key,
         fn: value,
       });
     }
@@ -94,12 +103,15 @@ export async function makeBundle(
   return {
     files,
     size,
-    entry,
+    runtimeChunkInfo,
     modules,
   };
 }
 
-function findWebpackRequireFn(ast: any, fileName: string): RequireFnInfo {
+function findWebpackRequireFn({
+  ast,
+  name: fileName,
+}: Chunk): WebpackRequireFnInfo {
   let functionDec: r.FunctionDeclaration | undefined = undefined;
   let moduleMapMemberExpr: r.MemberExpression | undefined = undefined;
 
@@ -137,12 +149,12 @@ function findWebpackRequireFn(ast: any, fileName: string): RequireFnInfo {
   }
 
   return {
-    functionDec,
+    declaration: functionDec,
     moduleMapMemberExpr,
   };
 }
 
-function findEntryModuleMap(ast: any): ModuleMap {
+function findEntryModuleMap({ ast }: Chunk): WebpackModuleMap {
   const modules: Record<string, AnyFunctionExpression> = {};
   let expr: r.ObjectExpression | r.ArrayExpression;
 
@@ -163,7 +175,7 @@ function findEntryModuleMap(ast: any): ModuleMap {
   };
 }
 
-function findAdditionalChunkModuleMap(ast: any): ModuleMap {
+function findAdditionalChunkModuleMap({ ast }: Chunk): WebpackModuleMap {
   const modules: Record<string, AnyFunctionExpression> = {};
   let expr: r.ObjectExpression | r.ArrayExpression;
 
@@ -188,7 +200,7 @@ function findAdditionalChunkModuleMap(ast: any): ModuleMap {
 
 // codemod the webpack module functions and write to disk
 async function writeModulesDirectory(
-  bundle: Bundle,
+  bundle: WebpackBundle,
   outDir: string,
   ext: string
 ): Promise<void> {
@@ -206,9 +218,7 @@ async function writeModulesDirectory(
       b.expressionStatement(b.assignmentExpression("=", moduleExportsExpr, fn)),
     ]);
 
-    const outputCode = recast.prettyPrint(moduleProgram, {
-      tabWidth: 2,
-    }).code;
+    const outputCode = recast.prettyPrint(moduleProgram, recastOpts).code;
     promises.push(
       fs.writeFile(path.join(outDir, `${name}.${ext}`), outputCode)
     );
@@ -216,74 +226,50 @@ async function writeModulesDirectory(
   await Promise.all(promises);
 }
 
-async function writeEntry(
-  bundle: Bundle,
+async function writeRuntimeChunk(
+  bundle: WebpackBundle,
   outDir: string,
   ext: string
 ): Promise<void> {
-  const { ast } = bundle.files.get(bundle.entry)!;
-  const { functionDec, moduleMapMemberExpr } = findWebpackRequireFn(
-    ast,
-    bundle.entry
-  );
+  const {
+    chunk: { ast },
+    requireFn: { moduleMapMemberExpr },
+    moduleMap: { expr: moduleMapExpr },
+  } = bundle.runtimeChunkInfo;
 
   // replace the `moduleMap[e]` in the require function with `require(moduleMap[e])`
-  recast.visit(functionDec, {
-    visitMemberExpression(path) {
-      if (path.node === moduleMapMemberExpr) {
-        path.replace(b.callExpression(b.identifier("require"), [path.node]));
-        return false;
-      }
-
-      this.traverse(path);
-    },
-  });
+  replaceAstNode(
+    moduleMapMemberExpr,
+    b.callExpression(b.identifier("require"), [moduleMapMemberExpr])
+  );
 
   // replace the actual module map expression with our mapping from module ID -> file name
-  const { expr: moduleMapExpr } = findEntryModuleMap(ast);
-  const newModuleMap = Object.fromEntries(
-    [...bundle.modules.keys()].map((k) => {
-      return [k, b.literal(`./modules/${bundle.modules.get(k)!.name}.${ext}`)];
-    })
+  const modules: [string, r.Literal][] = [...bundle.modules.entries()].map(
+    ([k, m]) => [k, b.literal(path.join(modulesDirName, `${m.name}.${ext}`))]
   );
   const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
-    ? b.arrayExpression(Object.values(newModuleMap))
+    ? b.arrayExpression(modules.map(([_, v]) => v))
     : b.objectExpression(
-        Object.entries(newModuleMap).map(([k, literal]) =>
-          b.property("init", b.literal(k), literal)
-        )
+        modules.map(([k, v]) => b.property("init", b.literal(k), v))
       );
+  replaceAstNode(moduleMapExpr, newModuleMapExpr);
 
-  recast.visit(ast, {
-    visitNode(path) {
-      const node = path.node;
-      if (node === moduleMapExpr) {
-        path.replace(newModuleMapExpr);
-        return false;
-      }
-
-      this.traverse(path);
-    },
-  });
-
-  await fs.writeFile(
-    path.join(outDir, `index.${ext}`),
-    recast.prettyPrint(ast.program, { tabWidth: 2 }).code
-  );
+  const { code } = recast.prettyPrint(ast.program, recastOpts);
+  await fs.writeFile(path.join(outDir, `index.${ext}`), code);
 }
 
 export async function writeBundle(
   outDir: string,
-  bundle: Bundle,
+  bundle: WebpackBundle,
   clear: boolean,
   ext: string
 ): Promise<void> {
-  const moduleDir = path.join(outDir, "modules");
+  const moduleDir = path.resolve(outDir, modulesDirName);
   await ensureDirectory(outDir, clear);
   await ensureDirectory(moduleDir, clear);
 
   await Promise.all([
     writeModulesDirectory(bundle, moduleDir, ext),
-    writeEntry(bundle, outDir, ext),
+    writeRuntimeChunk(bundle, outDir, ext),
   ]);
 }

@@ -18,10 +18,8 @@ async function unbundle(
   const bundle = await makeBundle(inDir, options.entry);
   const fileNames = [...bundle.files.keys()];
   console.log(`Loaded ${fileNames.length} file(s) from ${inDir}.`);
-  console.log(` - Files: ${fileNames.join(", ")}`);
-  console.log(
-    ` - Entry: ${bundle.entry}` + (options.entry ? "" : " (auto-detected)")
-  );
+  console.log(` - Files (${fileNames.length}): ${fileNames.join(", ")}`);
+  console.log(` - Runtime Chunk: ${bundle.runtimeChunkInfo.chunk.name}`);
   console.log(` - Total size: ${formatBytes(bundle.size)}`);
   console.log(` - Unique modules: ${bundle.modules.size}`);
 
