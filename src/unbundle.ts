@@ -239,34 +239,26 @@ async function writeEntry(
     },
   });
 
+  // replace the actual module map expression with our mapping from module ID -> file name
   const { expr: moduleMapExpr } = findEntryModuleMap(ast);
+  const newModuleMap = Object.fromEntries(
+    [...bundle.modules.keys()].map((k) => {
+      return [k, b.literal(`./modules/${bundle.modules.get(k)!.name}.${ext}`)];
+    })
+  );
+  const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
+    ? b.arrayExpression(Object.values(newModuleMap))
+    : b.objectExpression(
+        Object.entries(newModuleMap).map(([k, literal]) =>
+          b.property("init", b.literal(k), literal)
+        )
+      );
 
   recast.visit(ast, {
-    visitArrayExpression(path) {
+    visitNode(path) {
       const node = path.node;
       if (node === moduleMapExpr) {
-        path.replace(
-          b.arrayExpression([...bundle.modules.values()].map((v) => v.fn))
-        );
-        return false;
-      }
-
-      this.traverse(path);
-    },
-    visitObjectExpression(path) {
-      const node = path.node;
-      if (node === moduleMapExpr) {
-        path.replace(
-          b.objectExpression(
-            [...bundle.modules.keys()].map((k) => {
-              return b.property(
-                "init",
-                b.literal(k),
-                bundle.modules.get(k)!.fn
-              );
-            })
-          )
-        );
+        path.replace(newModuleMapExpr);
         return false;
       }
 
