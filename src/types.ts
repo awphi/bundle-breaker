@@ -12,11 +12,15 @@ export interface ModuleFn {
 }
 
 export interface Bundle {
-  dir: string;
   files: Map<string, Chunk>;
   size: number;
   entry: string;
   modules: Map<string, ModuleFn>;
+}
+
+export interface RequireFnInfo {
+  functionDec: r.FunctionDeclaration;
+  moduleMapMemberExpr: r.MemberExpression;
 }
 
 export type AnyFunctionExpression =

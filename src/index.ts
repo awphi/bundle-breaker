@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { makeBundle, writeEntry, writeModulesDirectory } from "./unbundle";
+import { makeBundle, writeBundle } from "./unbundle";
 import path from "path";
 import { version, description, name } from "../package.json";
-import { ensureDirectory, formatBytes } from "./utils";
+import { formatBytes } from "./utils";
 
 const program = new Command();
 
@@ -14,18 +14,10 @@ async function unbundle(
 ): Promise<void> {
   const inDir = path.resolve(baseInDir);
   const outDir = path.resolve(baseOutDir);
-  const moduleDir = path.join(outDir, "modules");
-
-  await Promise.all([
-    ensureDirectory(inDir, false),
-    ensureDirectory(outDir, !!options.clear).then(() =>
-      ensureDirectory(moduleDir, !!options.clear)
-    ),
-  ]);
 
   const bundle = await makeBundle(inDir, options.entry);
   const fileNames = [...bundle.files.keys()];
-  console.log(`Loaded ${fileNames.length} file(s) from ${bundle.dir}.`);
+  console.log(`Loaded ${fileNames.length} file(s) from ${inDir}.`);
   console.log(` - Files: ${fileNames.join(", ")}`);
   console.log(
     ` - Entry: ${bundle.entry}` + (options.entry ? "" : " (auto-detected)")
@@ -33,10 +25,7 @@ async function unbundle(
   console.log(` - Total size: ${formatBytes(bundle.size)}`);
   console.log(` - Unique modules: ${bundle.modules.size}`);
 
-  await Promise.all([
-    writeModulesDirectory(bundle, moduleDir, options.extension),
-    writeEntry(bundle, outDir, options.extension),
-  ]);
+  await writeBundle(outDir, bundle, !!options.clear, options.extension);
 }
 
 program.name(name).description(description).version(version);

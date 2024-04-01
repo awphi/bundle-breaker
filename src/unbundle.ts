@@ -1,10 +1,15 @@
 import path from "path";
 import fs from "fs/promises";
-import type { AnyFunctionExpression, Bundle, ModuleMap } from "./types";
+import type {
+  AnyFunctionExpression,
+  Bundle,
+  ModuleMap,
+  RequireFnInfo,
+} from "./types";
 import * as recast from "recast";
 
 import r = recast.types.namedTypes;
-import { isIIFE, isSingleExpressionProgram } from "./utils";
+import { ensureDirectory, isIIFE, isSingleExpressionProgram } from "./utils";
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
 
@@ -17,7 +22,6 @@ function findEntry(files: Bundle["files"]): string {
     try {
       findWebpackRequireFn(ast.program, file);
     } catch (e) {
-      console.log(e);
       maybeEntry.delete(file);
     }
   }
@@ -36,6 +40,8 @@ export async function makeBundle(
   dir: string,
   entryIn?: string
 ): Promise<Bundle> {
+  await ensureDirectory(dir, false);
+
   // TODO should use a glob
   const fileNames = await fs.readdir(dir);
 
@@ -70,115 +76,30 @@ export async function makeBundle(
     );
   }
 
+  const modules: Bundle["modules"] = new Map();
+  for (const file of files.keys()) {
+    const { ast } = files.get(file)!;
+    const findModuleMapFn =
+      file === entry ? findEntryModuleMap : findAdditionalChunkModuleMap;
+    const newModules = Object.entries(findModuleMapFn(ast).modules);
+
+    for (const [key, value] of newModules) {
+      modules.set(key, {
+        name: key.toString(),
+        fn: value,
+      });
+    }
+  }
+
   return {
-    dir,
     files,
     size,
     entry,
-    modules: getModules(files, entry),
+    modules,
   };
 }
 
-// codemod the webpack module functions and write to disk
-export async function writeModulesDirectory(
-  bundle: Bundle,
-  outDir: string,
-  ext: string
-): Promise<void> {
-  const promises: Promise<void>[] = [];
-
-  const moduleExportsExpr = b.memberExpression(
-    b.identifier("module"),
-    b.identifier("exports")
-  );
-
-  for (const moduleId of bundle.modules.keys()) {
-    const { fn, name } = bundle.modules.get(moduleId)!;
-
-    const moduleProgram = b.program([
-      b.expressionStatement(b.assignmentExpression("=", moduleExportsExpr, fn)),
-    ]);
-
-    const outputCode = recast.prettyPrint(moduleProgram, {
-      tabWidth: 2,
-    }).code;
-    promises.push(
-      fs.writeFile(path.join(outDir, `${name}.${ext}`), outputCode)
-    );
-  }
-}
-
-export async function writeEntry(
-  bundle: Bundle,
-  outDir: string,
-  ext: string
-): Promise<void> {
-  const { ast } = bundle.files.get(bundle.entry)!;
-  const { functionDec, moduleMapMemberExpr } = findWebpackRequireFn(
-    ast,
-    bundle.entry
-  );
-
-  // replace the `moduleMap[e]` in the require function with `require(moduleMap[e])`
-  recast.visit(functionDec, {
-    visitMemberExpression(path) {
-      if (path.node === moduleMapMemberExpr) {
-        path.replace(b.callExpression(b.identifier("require"), [path.node]));
-        return false;
-      }
-
-      this.traverse(path);
-    },
-  });
-
-  const { expr: moduleMapExpr } = findEntryModuleMap(ast);
-
-  recast.visit(ast, {
-    visitArrayExpression(path) {
-      const node = path.node;
-      if (node === moduleMapExpr) {
-        path.replace(
-          b.arrayExpression([...bundle.modules.values()].map((v) => v.fn))
-        );
-        return false;
-      }
-
-      this.traverse(path);
-    },
-    visitObjectExpression(path) {
-      const node = path.node;
-      if (node === moduleMapExpr) {
-        path.replace(
-          b.objectExpression(
-            [...bundle.modules.keys()].map((k) => {
-              return b.property(
-                "init",
-                b.literal(k),
-                bundle.modules.get(k)!.fn
-              );
-            })
-          )
-        );
-        return false;
-      }
-
-      this.traverse(path);
-    },
-  });
-
-  await fs.writeFile(
-    path.join(outDir, `index.${ext}`),
-    recast.prettyPrint(ast.program, { tabWidth: 2 }).code
-  );
-}
-
-function findWebpackRequireFn(
-  ast: any,
-  fileName: string
-): {
-  functionDec: r.FunctionDeclaration;
-  moduleMapMemberExpr: r.MemberExpression;
-} {
+function findWebpackRequireFn(ast: any, fileName: string): RequireFnInfo {
   let functionDec: r.FunctionDeclaration | undefined = undefined;
   let moduleMapMemberExpr: r.MemberExpression | undefined = undefined;
 
@@ -265,21 +186,112 @@ function findAdditionalChunkModuleMap(ast: any): ModuleMap {
   return { modules, expr };
 }
 
-function getModules(files: Bundle["files"], entry: string): Bundle["modules"] {
-  const modules: Bundle["modules"] = new Map();
-  for (const file of files.keys()) {
-    const { ast } = files.get(file)!;
-    const findModuleMapFn =
-      file === entry ? findEntryModuleMap : findAdditionalChunkModuleMap;
-    const newModules = Object.entries(findModuleMapFn(ast).modules);
+// codemod the webpack module functions and write to disk
+async function writeModulesDirectory(
+  bundle: Bundle,
+  outDir: string,
+  ext: string
+): Promise<void> {
+  const promises: Promise<void>[] = [];
 
-    for (const [key, value] of newModules) {
-      modules.set(key, {
-        name: key.toString(),
-        fn: value,
-      });
-    }
+  const moduleExportsExpr = b.memberExpression(
+    b.identifier("module"),
+    b.identifier("exports")
+  );
+
+  for (const moduleId of bundle.modules.keys()) {
+    const { fn, name } = bundle.modules.get(moduleId)!;
+
+    const moduleProgram = b.program([
+      b.expressionStatement(b.assignmentExpression("=", moduleExportsExpr, fn)),
+    ]);
+
+    const outputCode = recast.prettyPrint(moduleProgram, {
+      tabWidth: 2,
+    }).code;
+    promises.push(
+      fs.writeFile(path.join(outDir, `${name}.${ext}`), outputCode)
+    );
   }
+  await Promise.all(promises);
+}
 
-  return modules;
+async function writeEntry(
+  bundle: Bundle,
+  outDir: string,
+  ext: string
+): Promise<void> {
+  const { ast } = bundle.files.get(bundle.entry)!;
+  const { functionDec, moduleMapMemberExpr } = findWebpackRequireFn(
+    ast,
+    bundle.entry
+  );
+
+  // replace the `moduleMap[e]` in the require function with `require(moduleMap[e])`
+  recast.visit(functionDec, {
+    visitMemberExpression(path) {
+      if (path.node === moduleMapMemberExpr) {
+        path.replace(b.callExpression(b.identifier("require"), [path.node]));
+        return false;
+      }
+
+      this.traverse(path);
+    },
+  });
+
+  const { expr: moduleMapExpr } = findEntryModuleMap(ast);
+
+  recast.visit(ast, {
+    visitArrayExpression(path) {
+      const node = path.node;
+      if (node === moduleMapExpr) {
+        path.replace(
+          b.arrayExpression([...bundle.modules.values()].map((v) => v.fn))
+        );
+        return false;
+      }
+
+      this.traverse(path);
+    },
+    visitObjectExpression(path) {
+      const node = path.node;
+      if (node === moduleMapExpr) {
+        path.replace(
+          b.objectExpression(
+            [...bundle.modules.keys()].map((k) => {
+              return b.property(
+                "init",
+                b.literal(k),
+                bundle.modules.get(k)!.fn
+              );
+            })
+          )
+        );
+        return false;
+      }
+
+      this.traverse(path);
+    },
+  });
+
+  await fs.writeFile(
+    path.join(outDir, `index.${ext}`),
+    recast.prettyPrint(ast.program, { tabWidth: 2 }).code
+  );
+}
+
+export async function writeBundle(
+  outDir: string,
+  bundle: Bundle,
+  clear: boolean,
+  ext: string
+): Promise<void> {
+  const moduleDir = path.join(outDir, "modules");
+  await ensureDirectory(outDir, clear);
+  await ensureDirectory(moduleDir, clear);
+
+  await Promise.all([
+    writeModulesDirectory(bundle, moduleDir, ext),
+    writeEntry(bundle, outDir, ext),
+  ]);
 }
