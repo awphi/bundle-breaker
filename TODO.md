@@ -8,11 +8,10 @@
 
 # Test case ideas
 
-Example usage from `/examples/webpack4`: `export NODE_OPTIONS=--openssl-legacy-provider && pnpm webpack -c splitchunks/webpack.config.js`
-
+- [x] Chunk splitting
+- [x] output.iife on vs off in WP5
 - [ ] Hashed module IDs plugin
 - [ ] Terser plugin
-- [ ] Chunk splitting
 - [ ] Different values of output.chunkFormat in WP5 (doesn't exist in WP4) - will likely need dev work
 
 # Enhancements

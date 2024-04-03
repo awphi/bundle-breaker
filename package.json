@@ -16,7 +16,8 @@
   ],
   "scripts": {
     "dev": "esbuild src/index.ts --bundle --platform=node --packages=external --outdir=dist --watch",
-    "prepack": "tsc"
+    "prepack": "tsc",
+    "build-all-examples": "node example-builder.js build-all"
   },
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",

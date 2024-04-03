@@ -1,7 +1,12 @@
 {
   "name": "@webpack-unbundle/webpack5",
   "private": true,
-  "scripts": {
-  },
-  "author": "awphi (adamw.ph)"
+  "scripts": {},
+  "author": "awphi (adamw.ph)",
+  "devDependencies": {
+    "babel-loader": "^8.0.5",
+    "is-even": "^1.0.0",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.0.0"
+  }
 }
