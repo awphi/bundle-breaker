@@ -40,6 +40,7 @@ export interface WebpackRequireFnInfo {
 export interface WebpackModule {
   fn: AnyFunctionExpression;
   name: string;
+  sourceFile: string;
 }
 
 export interface WebpackBundle {

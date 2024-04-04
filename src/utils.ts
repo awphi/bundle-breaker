@@ -1,6 +1,10 @@
 import path from "path";
 import fs from "fs/promises";
-import type { AnyFunctionExpression, IifeExpression } from "./types";
+import type {
+  AnyFunctionExpression,
+  IifeExpression,
+  WebpackModuleMap,
+} from "./types";
 import * as recast from "recast";
 
 const urlAlphabet =
@@ -135,8 +139,8 @@ export function replaceAstNodes(
   });
 }
 
-export function addModulesToBundle(
-  modules: Record<string, AnyFunctionExpression>,
+export function addModulesToModuleMap(
+  modules: WebpackModuleMap["modules"],
   properties: r.ObjectExpression["properties"]
 ): void {
   for (const prop of properties) {

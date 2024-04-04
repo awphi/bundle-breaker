@@ -1,7 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
 import type {
-  AnyFunctionExpression,
   Chunk,
   WebpackBundle,
   WebpackModuleMap,
@@ -15,7 +14,7 @@ const modulesDirName = "./modules";
 
 import r = recast.types.namedTypes;
 import {
-  addModulesToBundle,
+  addModulesToModuleMap,
   ensureDirectory,
   isAnyFunctionExpression,
   isIIFE,
@@ -87,19 +86,24 @@ export async function makeBundle(
   const modules: WebpackBundle["modules"] = new Map();
   for (const chunk of files.values()) {
     const findModuleMapFn =
-      chunk.name === runtimeChunkInfo.chunk.name
+      chunk === runtimeChunkInfo.chunk
         ? findEntryModuleMap
         : findAdditionalChunkModuleMap;
-    const newModules = Object.entries(findModuleMapFn(chunk).modules);
+    const moduleMap = findModuleMapFn(chunk);
 
-    for (const [key, value] of newModules) {
+    for (const [key, value] of Object.entries(moduleMap.modules)) {
       if (modules.has(key)) {
-        throw new Error(`Encountered module ID clash '${key}'.`);
+        throw new Error(
+          `Encountered module ID clash '${key}' - found in ${
+            modules.get(key).sourceFile
+          } and ${chunk.name}.`
+        );
       }
 
       modules.set(key, {
         name: nanoid(6),
         fn: value,
+        sourceFile: chunk.name,
       });
     }
   }
@@ -173,8 +177,10 @@ function findWebpackRequireFn({
 }
 
 function findEntryModuleMap({ ast }: Chunk): WebpackModuleMap {
-  const modules: Record<string, AnyFunctionExpression> = {};
-  let expr: r.ObjectExpression | r.ArrayExpression;
+  const result: WebpackModuleMap = {
+    modules: {},
+    expr: undefined,
+  };
 
   // TODO we may be able to re-use some logic from findWebpackRequireFn and passing in here
   if (isSingleExpressionProgram(ast.program.body)) {
@@ -188,15 +194,14 @@ function findEntryModuleMap({ ast }: Chunk): WebpackModuleMap {
     // TODO extract modules out
   }
 
-  return {
-    modules,
-    expr,
-  };
+  return result;
 }
 
 function findAdditionalChunkModuleMap({ ast }: Chunk): WebpackModuleMap {
-  const modules: Record<string, AnyFunctionExpression> = {};
-  let expr: r.ObjectExpression | r.ArrayExpression;
+  const result: WebpackModuleMap = {
+    modules: {},
+    expr: undefined,
+  };
 
   // look for a single expression program with a .push(arg) - could tighten this up but seems to get the job done for now
   if (isSingleExpressionProgram(ast.program.body)) {
@@ -212,18 +217,18 @@ function findAdditionalChunkModuleMap({ ast }: Chunk): WebpackModuleMap {
       const param = call.expression.arguments[0];
       if (n.ArrayExpression.check(param)) {
         if (param.elements.length === 3) {
-          const moduleMap = param.elements[1];
           // webpack 4 - array-push calls have 3 args - [chunkIds: int[], moreModules: fn[] | {id -> fn}, executeModules: int[]]
-          // TODO think about how to include executeModules in the modded runtime chunk
+          const moduleMap = param.elements[1];
+
           if (n.ObjectExpression.check(moduleMap)) {
-            expr = moduleMap;
-            addModulesToBundle(modules, moduleMap.properties);
+            result.expr = moduleMap;
+            addModulesToModuleMap(result.modules, moduleMap.properties);
           } else if (n.ArrayExpression.check(moduleMap)) {
-            expr = moduleMap;
+            result.expr = moduleMap;
             for (let i = 0; i < moduleMap.elements.length; i++) {
               const fn = moduleMap.elements[i];
               if (isAnyFunctionExpression(fn)) {
-                modules[i.toString()] = fn;
+                result.modules[i.toString()] = fn;
               }
             }
           }
@@ -233,14 +238,14 @@ function findAdditionalChunkModuleMap({ ast }: Chunk): WebpackModuleMap {
         ) {
           // webpack 5 - always an object expr :)
           const moduleMap = param.elements[1];
-          expr = moduleMap;
-          addModulesToBundle(modules, moduleMap.properties);
+          result.expr = moduleMap;
+          addModulesToModuleMap(result.modules, moduleMap.properties);
         }
       }
     }
   }
 
-  return { modules, expr };
+  return result;
 }
 
 // codemod the webpack module functions and write to disk
@@ -277,7 +282,7 @@ async function writeRuntimeChunk(
   ext: string
 ): Promise<void> {
   const {
-    chunk: { ast },
+    chunk: { ast, name },
     requireFn: { moduleMapMemberExpr },
     moduleMap: { expr: moduleMapExpr },
   } = bundle.runtimeChunkInfo;
@@ -305,7 +310,38 @@ async function writeRuntimeChunk(
   );
 
   const { code } = recast.prettyPrint(ast.program, recastOpts);
-  await fs.writeFile(path.join(outDir, `index.${ext}`), code);
+  await fs.writeFile(path.join(outDir, `${name}.${ext}`), code);
+}
+
+export async function writeAdditionalChunks(
+  bundle: WebpackBundle,
+  outDir: string,
+  ext: string
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
+  for (const file of bundle.files.values()) {
+    if (file === bundle.runtimeChunkInfo.chunk) {
+      continue;
+    }
+
+    const { ast, name } = file;
+
+    // TODO it would be nice to cache the result of findAdditionalChunkModuleMap earlier when building the bundle
+    const moduleMapExpr = findAdditionalChunkModuleMap(file).expr;
+    const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
+      ? b.arrayExpression([])
+      : b.objectExpression([]);
+
+    replaceAstNodes(ast.program, new Map([[moduleMapExpr, newModuleMapExpr]]));
+
+    const outputCode = recast.prettyPrint(ast.program, recastOpts).code;
+    promises.push(
+      fs.writeFile(path.join(outDir, `${name}.${ext}`), outputCode)
+    );
+  }
+
+  await Promise.all(promises);
 }
 
 export async function writeBundle(
@@ -321,5 +357,6 @@ export async function writeBundle(
   await Promise.all([
     writeModulesDirectory(bundle, moduleDir, ext),
     writeRuntimeChunk(bundle, outDir, ext),
+    writeAdditionalChunks(bundle, outDir, ext),
   ]);
 }
