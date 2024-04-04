@@ -4,12 +4,22 @@ import r = recast.types.namedTypes;
 export interface Chunk {
   name: string;
   code: string;
-  ast: any;
+  ast: {
+    program: r.Program;
+  };
 }
 
 export type AnyFunctionExpression =
   | r.ArrowFunctionExpression
   | r.FunctionExpression;
+
+export interface IifeCallExpression extends r.CallExpression {
+  callee: AnyFunctionExpression;
+}
+
+export interface IifeExpression extends r.ExpressionStatement {
+  expression: IifeCallExpression;
+}
 
 export interface WebpackModuleMap {
   modules: Record<string, AnyFunctionExpression>;

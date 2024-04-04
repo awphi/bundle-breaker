@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
-import type { AnyFunctionExpression } from "./types";
+import type { AnyFunctionExpression, IifeExpression } from "./types";
 import * as recast from "recast";
 
 import r = recast.types.namedTypes;
@@ -14,7 +14,7 @@ export function isAnyFunctionExpression(
   );
 }
 
-export function isIIFE(node: r.ASTNode): node is r.ExpressionStatement {
+export function isIIFE(node: r.ASTNode): node is IifeExpression {
   if (n.ExpressionStatement.check(node)) {
     if (n.UnaryExpression.check(node.expression)) {
       return isIIFE(node.expression.argument);
@@ -32,7 +32,7 @@ export function isIIFE(node: r.ASTNode): node is r.ExpressionStatement {
   );
 }
 
-export function isSingleExpressionProgram(body: r.Statement[]): boolean {
+export function isSingleExpressionProgram(body: r.Program["body"]): boolean {
   if (body.length === 1) {
     return true;
   }
@@ -87,7 +87,8 @@ export function formatBytes(bytes: number, si = false, dp = 1): string {
 // ensure a directory exists, is a directory and optionall is empty
 export async function ensureDirectory(
   pth: string,
-  clear: boolean = false
+  clear: boolean = false,
+  create: boolean = true
 ): Promise<void> {
   let exists = false;
   try {
@@ -99,7 +100,7 @@ export async function ensureDirectory(
     }
   } catch (e) {}
 
-  if (!exists) {
+  if (!exists && create) {
     await fs.mkdir(pth, { recursive: true });
   }
 
@@ -111,16 +112,19 @@ export async function ensureDirectory(
   }
 }
 
-export function replaceAstNode(
-  old: r.ASTNode,
-  replacement?: r.ASTNode,
-  ...args: r.ASTNode[]
+export function replaceAstNodes(
+  parent: r.ASTNode,
+  replacements: Map<r.Node, r.Node>
 ): void {
-  recast.visit(old, {
+  recast.visit(parent, {
     visitNode(path) {
-      if (path.node === old) {
-        path.replace(replacement, ...args);
-        return false;
+      if (replacements.has(path.node)) {
+        const v = replacements.get(path.node);
+        replacements.delete(path.node);
+        path.replace(v);
+        if (replacements.size === 0) {
+          return false;
+        }
       }
 
       this.traverse(path);

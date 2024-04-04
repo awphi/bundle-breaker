@@ -18,7 +18,7 @@ import {
   ensureDirectory,
   isIIFE,
   isSingleExpressionProgram,
-  replaceAstNode,
+  replaceAstNodes,
 } from "./utils";
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
@@ -29,12 +29,13 @@ function findRuntimeChunk(
   for (const chunk of chunks) {
     try {
       // attempt to make an object, simply try the next chunk if we get an error
-      const info: WebpackRuntimeChunkInfo = {
+      const requireFn = findWebpackRequireFn(chunk);
+      const moduleMap = findEntryModuleMap(chunk);
+      return {
         chunk,
-        requireFn: findWebpackRequireFn(chunk),
-        moduleMap: findEntryModuleMap(chunk),
+        requireFn,
+        moduleMap,
       };
-      return info;
     } catch {}
   }
 
@@ -46,7 +47,7 @@ export async function makeBundle(
   dir: string,
   entryIn?: string
 ): Promise<WebpackBundle> {
-  await ensureDirectory(dir, false);
+  await ensureDirectory(dir, false, false);
 
   // TODO should use a glob
   const fileNames = await fs.readdir(dir);
@@ -81,12 +82,12 @@ export async function makeBundle(
   const runtimeChunkInfo = findRuntimeChunk(potentitalRuntimeChunks);
 
   const modules: WebpackBundle["modules"] = new Map();
-  for (const { ast, name: fileName } of files.values()) {
+  for (const chunk of files.values()) {
     const findModuleMapFn =
-      fileName === runtimeChunkInfo.chunk.name
+      chunk.name === runtimeChunkInfo.chunk.name
         ? findEntryModuleMap
         : findAdditionalChunkModuleMap;
-    const newModules = Object.entries(findModuleMapFn(ast).modules);
+    const newModules = Object.entries(findModuleMapFn(chunk).modules);
 
     for (const [key, value] of newModules) {
       if (modules.has(key)) {
@@ -114,32 +115,46 @@ function findWebpackRequireFn({
 }: Chunk): WebpackRequireFnInfo {
   let functionDec: r.FunctionDeclaration | undefined = undefined;
   let moduleMapMemberExpr: r.MemberExpression | undefined = undefined;
+  let body: r.Program["body"] = [];
 
-  recast.visit(ast, {
+  // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
+  if (isSingleExpressionProgram(ast.program.body)) {
+    const iife = ast.program.body[ast.program.body.length - 1];
+    if (isIIFE(iife) && n.BlockStatement.check(iife.expression.callee.body)) {
+      body = iife.expression.callee.body.body;
+    }
+  } else {
+    body = ast.program.body;
+  }
+
+  const functionDecs = body.filter((v) =>
+    n.FunctionDeclaration.check(v)
+  ) as r.FunctionDeclaration[];
+
+  // most bundles will just have one function declaration (the require fn), however some webpack4 configs with
+  // runtime chunk splitting will have multiple, with the *last* function declaration being the require fn
+  functionDec = functionDecs[functionDecs.length - 1];
+
+  // now find the first call expression on a member expression
+  // in WP5 this looks like __webpack_modules__[moduleId](module, module.exports, __webpack_require__)
+  // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+  recast.visit(functionDec, {
     visitCallExpression(path) {
-      const node = path.node;
-      // ExpressionStatement > BlockStatement > FunctionDeclaration
-      const funcParent = path.parent?.parent?.parent?.node;
-      // expect something like function(e) { something[e].call(arg1, arg2, arg3, arg4) }
-      // and return a ref to that function and that something[e] member expression
-      if (
-        funcParent &&
-        r.MemberExpression.check(node.callee) &&
-        r.MemberExpression.check(node.callee.object) &&
-        node.callee.object.computed === true &&
-        r.Identifier.check(node.callee.object.property) &&
-        r.Identifier.check(node.callee.property) &&
-        node.callee.property.name === "call" &&
-        node.arguments.length === 4 &&
-        r.FunctionDeclaration.check(funcParent) &&
-        funcParent.params.length === 1 &&
-        r.Identifier.check(funcParent.params[0]) &&
-        funcParent.params[0].name === node.callee.object.property.name
-      ) {
-        functionDec = funcParent;
-        moduleMapMemberExpr = node.callee.object;
+      const { node } = path;
+
+      if (n.MemberExpression.check(node.callee)) {
+        if (
+          n.MemberExpression.check(node.callee.object) &&
+          n.Identifier.check(node.callee.property) &&
+          node.callee.property.name === "call"
+        ) {
+          moduleMapMemberExpr = node.callee.object;
+        } else {
+          moduleMapMemberExpr = node.callee;
+        }
         return false;
       }
+
       this.traverse(path);
     },
   });
@@ -158,8 +173,9 @@ function findEntryModuleMap({ ast }: Chunk): WebpackModuleMap {
   const modules: Record<string, AnyFunctionExpression> = {};
   let expr: r.ObjectExpression | r.ArrayExpression;
 
-  if (isSingleExpressionProgram(ast.program)) {
-    const iife = ast.program.body[ast.body.length - 1];
+  // TODO we may be able to re-use some logic from findWebpackRequireFn and passing in here
+  if (isSingleExpressionProgram(ast.program.body)) {
+    const iife = ast.program.body[ast.program.body.length - 1];
     if (isIIFE(iife)) {
       // it's webpack 4 (or 5 with an iife)
       // TODO check if webpack 5 (by looking for a lack of args to the iife - otherwise we can re-use the logic below for webpack 5 without an iife)
@@ -180,7 +196,7 @@ function findAdditionalChunkModuleMap({ ast }: Chunk): WebpackModuleMap {
   let expr: r.ObjectExpression | r.ArrayExpression;
 
   // look for a single expression program with a .push(arg) - could tighten this up but seems to get the job done for now
-  if (isSingleExpressionProgram(ast)) {
+  if (isSingleExpressionProgram(ast.program.body)) {
     const call = ast.program.body[ast.program.body.length - 1];
     if (
       n.ExpressionStatement.check(call) &&
@@ -237,13 +253,6 @@ async function writeRuntimeChunk(
     moduleMap: { expr: moduleMapExpr },
   } = bundle.runtimeChunkInfo;
 
-  // replace the `moduleMap[e]` in the require function with `require(moduleMap[e])`
-  replaceAstNode(
-    moduleMapMemberExpr,
-    b.callExpression(b.identifier("require"), [moduleMapMemberExpr])
-  );
-
-  // replace the actual module map expression with our mapping from module ID -> file name
   const modules: [string, r.Literal][] = [...bundle.modules.entries()].map(
     ([k, m]) => [k, b.literal(path.join(modulesDirName, `${m.name}.${ext}`))]
   );
@@ -252,7 +261,19 @@ async function writeRuntimeChunk(
     : b.objectExpression(
         modules.map(([k, v]) => b.property("init", b.literal(k), v))
       );
-  replaceAstNode(moduleMapExpr, newModuleMapExpr);
+
+  replaceAstNodes(
+    ast.program,
+    new Map<r.Node, r.Node>([
+      // replace the module map member expression in the require function with require(...)
+      [
+        moduleMapMemberExpr,
+        b.callExpression(b.identifier("require"), [moduleMapMemberExpr]),
+      ],
+      // replace the actual module map expression with our mapping from module ID -> file name
+      [moduleMapExpr, newModuleMapExpr],
+    ])
+  );
 
   const { code } = recast.prettyPrint(ast.program, recastOpts);
   await fs.writeFile(path.join(outDir, `index.${ext}`), code);
