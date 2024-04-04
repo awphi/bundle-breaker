@@ -3,6 +3,9 @@ import fs from "fs/promises";
 import type { AnyFunctionExpression, IifeExpression } from "./types";
 import * as recast from "recast";
 
+const urlAlphabet =
+  "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
+
 import r = recast.types.namedTypes;
 const n = recast.types.namedTypes;
 
@@ -131,3 +134,30 @@ export function replaceAstNodes(
     },
   });
 }
+
+export function addModulesToBundle(
+  modules: Record<string, AnyFunctionExpression>,
+  properties: r.ObjectExpression["properties"]
+): void {
+  for (const prop of properties) {
+    if (
+      n.Property.check(prop) &&
+      n.Literal.check(prop.key) &&
+      isAnyFunctionExpression(prop.value)
+    ) {
+      modules[prop.key.value.toString()] = prop.value;
+    }
+  }
+}
+
+/**
+ * From nanoid/non-secure - https://github.com/ai/nanoid
+ */
+export const nanoid = (size = 21) => {
+  let id = "";
+  let i = size;
+  while (i--) {
+    id += urlAlphabet[(Math.random() * 64) | 0];
+  }
+  return id;
+};

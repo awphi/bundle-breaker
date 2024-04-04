@@ -15,9 +15,12 @@ const modulesDirName = "./modules";
 
 import r = recast.types.namedTypes;
 import {
+  addModulesToBundle,
   ensureDirectory,
+  isAnyFunctionExpression,
   isIIFE,
   isSingleExpressionProgram,
+  nanoid,
   replaceAstNodes,
 } from "./utils";
 const n = recast.types.namedTypes;
@@ -95,7 +98,7 @@ export async function makeBundle(
       }
 
       modules.set(key, {
-        name: key,
+        name: nanoid(6),
         fn: value,
       });
     }
@@ -207,7 +210,33 @@ function findAdditionalChunkModuleMap({ ast }: Chunk): WebpackModuleMap {
       call.expression.callee.property.name === "push"
     ) {
       const param = call.expression.arguments[0];
-      // TODO finish this up - check exact structure of the params of a webpack5 .push() call
+      if (n.ArrayExpression.check(param)) {
+        if (param.elements.length === 3) {
+          const moduleMap = param.elements[1];
+          // webpack 4 - array-push calls have 3 args - [chunkIds: int[], moreModules: fn[] | {id -> fn}, executeModules: int[]]
+          // TODO think about how to include executeModules in the modded runtime chunk
+          if (n.ObjectExpression.check(moduleMap)) {
+            expr = moduleMap;
+            addModulesToBundle(modules, moduleMap.properties);
+          } else if (n.ArrayExpression.check(moduleMap)) {
+            expr = moduleMap;
+            for (let i = 0; i < moduleMap.elements.length; i++) {
+              const fn = moduleMap.elements[i];
+              if (isAnyFunctionExpression(fn)) {
+                modules[i.toString()] = fn;
+              }
+            }
+          }
+        } else if (
+          param.elements.length === 2 &&
+          n.ObjectExpression.check(param.elements[1])
+        ) {
+          // webpack 5 - always an object expr :)
+          const moduleMap = param.elements[1];
+          expr = moduleMap;
+          addModulesToBundle(modules, moduleMap.properties);
+        }
+      }
     }
   }
 

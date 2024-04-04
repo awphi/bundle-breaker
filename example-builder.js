@@ -39,8 +39,9 @@ async function buildExample(dir, silent) {
       env,
     });
 
+    proc.stderr.on("data", (err) => console.error(err.toString("utf-8")));
+
     if (!silent) {
-      proc.stderr.on("data", (err) => console.error(err.toString("utf-8")));
       proc.stdout.on("data", (err) => console.log(err.toString("utf-8")));
     }
 
