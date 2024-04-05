@@ -139,29 +139,32 @@ export function replaceAstNodes(
   });
 }
 
-export function addModulesToModuleMap(
-  modules: WebpackModuleMap["modules"],
-  properties: r.ObjectExpression["properties"]
-): void {
-  for (const prop of properties) {
-    if (
-      n.Property.check(prop) &&
-      n.Literal.check(prop.key) &&
-      isAnyFunctionExpression(prop.value)
-    ) {
-      modules[prop.key.value.toString()] = prop.value;
+export function makeModuleMap(expr?: r.ASTNode): WebpackModuleMap {
+  const result: WebpackModuleMap = {
+    moduleMapExpr: undefined,
+    modules: {},
+  };
+
+  if (n.ObjectExpression.check(expr)) {
+    result.moduleMapExpr = expr;
+    for (const prop of expr.properties) {
+      if (
+        n.Property.check(prop) &&
+        n.Literal.check(prop.key) &&
+        isAnyFunctionExpression(prop.value)
+      ) {
+        result.modules[prop.key.value.toString()] = prop.value;
+      }
+    }
+  } else if (n.ArrayExpression.check(expr)) {
+    result.moduleMapExpr = expr;
+    for (let i = 0; i < expr.elements.length; i++) {
+      const fn = expr.elements[i];
+      if (isAnyFunctionExpression(fn)) {
+        result.modules[i.toString()] = fn;
+      }
     }
   }
-}
 
-/**
- * From nanoid/non-secure - https://github.com/ai/nanoid
- */
-export const nanoid = (size = 21) => {
-  let id = "";
-  let i = size;
-  while (i--) {
-    id += urlAlphabet[(Math.random() * 64) | 0];
-  }
-  return id;
-};
+  return result;
+}

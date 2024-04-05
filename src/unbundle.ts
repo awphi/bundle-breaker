@@ -14,14 +14,13 @@ const modulesDirName = "./modules";
 
 import r = recast.types.namedTypes;
 import {
-  addModulesToModuleMap,
   ensureDirectory,
-  isAnyFunctionExpression,
   isIIFE,
   isSingleExpressionProgram,
-  nanoid,
+  makeModuleMap,
   replaceAstNodes,
 } from "./utils";
+import { createHash } from "crypto";
 const n = recast.types.namedTypes;
 const b = recast.types.builders;
 
@@ -86,10 +85,9 @@ export async function makeBundle(
       chunk === runtimeChunkInfo.chunk
         ? findEntryModuleMap
         : findAdditionalChunkModuleMap;
-    const moduleMap = findModuleMapFn(chunk);
-    chunk.moduleMap = moduleMap;
+    chunk.moduleMap = findModuleMapFn(chunk);
 
-    for (const [key, value] of Object.entries(moduleMap.modules)) {
+    for (const [key, value] of Object.entries(chunk.moduleMap!.modules)) {
       if (modules.has(key)) {
         throw new Error(
           `Encountered module ID clash '${key}' - found in ${
@@ -98,8 +96,12 @@ export async function makeBundle(
         );
       }
 
+      // TODO is re-hashing the key the most efficient way to make it URL compliant?
+      const hash = createHash("shake256", { outputLength: 4 });
+      hash.update(key);
       modules.set(key, {
-        name: nanoid(6),
+        // TODO optional content-based naming via heuristic static analysis - does't have to be very accurate just decent
+        name: hash.digest("base64url"),
         fn: value,
         src: chunk.name,
       });
@@ -175,32 +177,28 @@ function findWebpackRequireFn({
 }
 
 function findEntryModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
-  const result: WebpackModuleMap = {
-    modules: {},
-    moduleMapExpr: undefined,
-  };
-
-  // TODO we may be able to re-use some logic from findWebpackRequireFn and passing in here
-  if (isSingleExpressionProgram(ast.program.body)) {
-    const iife = ast.program.body[ast.program.body.length - 1];
-    if (isIIFE(iife)) {
-      // it's webpack 4 (or 5 with an iife)
-      // TODO check if webpack 5 (by looking for a lack of args to the iife - otherwise we can re-use the logic below for webpack 5 without an iife)
-    }
+  const maybeIife = ast.program.body[ast.program.body.length - 1];
+  if (
+    isSingleExpressionProgram(ast.program.body) &&
+    isIIFE(maybeIife) &&
+    maybeIife.expression.arguments.length == 1
+  ) {
+    // webpack 4  - the modules included in the runtime chunk are passed as the first and only arg to the main iife
+    return makeModuleMap(maybeIife.expression.arguments[0]);
   } else {
-    // it's webpack 5 (without an iife)
+    // webpack 5 - there exists a __webpack_modules__ variable in the body
+    const body =
+      isIIFE(maybeIife) &&
+      n.BlockStatement.check(maybeIife.expression.callee.body)
+        ? maybeIife.expression.callee.body.body
+        : ast.program.body;
     // TODO extract modules out
   }
 
-  return result;
+  return makeModuleMap();
 }
 
 function findAdditionalChunkModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
-  const result: WebpackModuleMap = {
-    modules: {},
-    moduleMapExpr: undefined,
-  };
-
   // look for a single expression program with a .push(arg) - could tighten this up but seems to get the job done for now
   if (isSingleExpressionProgram(ast.program.body)) {
     const call = ast.program.body[ast.program.body.length - 1];
@@ -213,37 +211,16 @@ function findAdditionalChunkModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
       call.expression.callee.property.name === "push"
     ) {
       const param = call.expression.arguments[0];
-      if (n.ArrayExpression.check(param)) {
-        if (param.elements.length === 3) {
-          // webpack 4 - array-push calls have 3 args - [chunkIds: int[], moreModules: fn[] | {id -> fn}, executeModules: int[]]
-          const moduleMap = param.elements[1];
 
-          if (n.ObjectExpression.check(moduleMap)) {
-            result.moduleMapExpr = moduleMap;
-            addModulesToModuleMap(result.modules, moduleMap.properties);
-          } else if (n.ArrayExpression.check(moduleMap)) {
-            result.moduleMapExpr = moduleMap;
-            for (let i = 0; i < moduleMap.elements.length; i++) {
-              const fn = moduleMap.elements[i];
-              if (isAnyFunctionExpression(fn)) {
-                result.modules[i.toString()] = fn;
-              }
-            }
-          }
-        } else if (
-          param.elements.length === 2 &&
-          n.ObjectExpression.check(param.elements[1])
-        ) {
-          // webpack 5 - always an object expr :)
-          const moduleMap = param.elements[1];
-          result.moduleMapExpr = moduleMap;
-          addModulesToModuleMap(result.modules, moduleMap.properties);
-        }
+      // webpack 4 uses 3 args and webpack 5 uses 2 - the second is always the actual module map (arr or obj)
+      // this check is quite loose for brevity but could be tightened
+      if (n.ArrayExpression.check(param) && param.elements.length >= 2) {
+        return makeModuleMap(param.elements[1]);
       }
     }
   }
 
-  return result;
+  return makeModuleMap();
 }
 
 // codemod the webpack module functions and write to disk
@@ -312,7 +289,10 @@ async function writeRuntimeChunk(
   );
 
   const { code } = recast.prettyPrint(ast.program, recastOpts);
-  await fs.writeFile(path.join(outDir, `${name}.${ext}`), code);
+  await fs.writeFile(
+    path.join(outDir, `${name.slice(0, -path.extname(name).length)}.${ext}`),
+    code
+  );
 }
 
 export async function writeAdditionalChunks(
