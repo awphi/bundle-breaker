@@ -18,6 +18,7 @@ import {
   isIIFE,
   isSingleExpressionProgram,
   makeModuleMap,
+  maybeUnwrapTopLevelIife,
   replaceAstNodes,
 } from "./utils";
 import { createHash } from "crypto";
@@ -122,17 +123,7 @@ function findWebpackRequireFn({
 }: WebpackChunk): WebpackRequireFnInfo {
   let functionDec: r.FunctionDeclaration | undefined = undefined;
   let moduleMapMemberExpr: r.MemberExpression | undefined = undefined;
-  let body: r.Program["body"] = [];
-
-  // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
-  if (isSingleExpressionProgram(ast.program.body)) {
-    const iife = ast.program.body[ast.program.body.length - 1];
-    if (isIIFE(iife) && n.BlockStatement.check(iife.expression.callee.body)) {
-      body = iife.expression.callee.body.body;
-    }
-  } else {
-    body = ast.program.body;
-  }
+  const body = maybeUnwrapTopLevelIife(ast.program);
 
   const functionDecs = body.filter((v) =>
     n.FunctionDeclaration.check(v)
@@ -140,31 +131,33 @@ function findWebpackRequireFn({
 
   // most bundles will just have one function declaration (the require fn), however some webpack4 configs with
   // runtime chunk splitting will have multiple, with the *last* function declaration being the require fn
-  functionDec = functionDecs[functionDecs.length - 1];
+  if (functionDecs.length > 0) {
+    functionDec = functionDecs[functionDecs.length - 1];
 
-  // now find the first call expression on a member expression
-  // in WP5 this looks like __webpack_modules__[moduleId](module, module.exports, __webpack_require__)
-  // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-  recast.visit(functionDec, {
-    visitCallExpression(path) {
-      const { node } = path;
+    // now find the first call expression on a member expression
+    // in WP5 this looks like __webpack_modules__[moduleId](module, module.exports, __webpack_require__)
+    // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+    recast.visit(functionDec, {
+      visitCallExpression(path) {
+        const { node } = path;
 
-      if (n.MemberExpression.check(node.callee)) {
-        if (
-          n.MemberExpression.check(node.callee.object) &&
-          n.Identifier.check(node.callee.property) &&
-          node.callee.property.name === "call"
-        ) {
-          moduleMapMemberExpr = node.callee.object;
-        } else {
-          moduleMapMemberExpr = node.callee;
+        if (n.MemberExpression.check(node.callee)) {
+          if (
+            n.MemberExpression.check(node.callee.object) &&
+            n.Identifier.check(node.callee.property) &&
+            node.callee.property.name === "call"
+          ) {
+            moduleMapMemberExpr = node.callee.object;
+          } else {
+            moduleMapMemberExpr = node.callee;
+          }
+          return false;
         }
-        return false;
-      }
 
-      this.traverse(path);
-    },
-  });
+        this.traverse(path);
+      },
+    });
+  }
 
   if (functionDec === undefined || moduleMapMemberExpr === undefined) {
     throw new Error(`Unable to find webpack require function in '${name}'`);
@@ -176,7 +169,7 @@ function findWebpackRequireFn({
   };
 }
 
-function findEntryModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
+function findEntryModuleMap({ ast, name }: WebpackChunk): WebpackModuleMap {
   const maybeIife = ast.program.body[ast.program.body.length - 1];
   if (
     isSingleExpressionProgram(ast.program.body) &&
@@ -187,18 +180,30 @@ function findEntryModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
     return makeModuleMap(maybeIife.expression.arguments[0]);
   } else {
     // webpack 5 - there exists a __webpack_modules__ variable in the body
-    const body =
-      isIIFE(maybeIife) &&
-      n.BlockStatement.check(maybeIife.expression.callee.body)
-        ? maybeIife.expression.callee.body.body
-        : ast.program.body;
-    // TODO extract modules out
+    const body = maybeUnwrapTopLevelIife(ast.program);
+    const variableDecs = body.filter((v) =>
+      n.VariableDeclaration.check(v)
+    ) as r.VariableDeclaration[];
+
+    // assumes the __webpack_modules__ declaration comes first and is on its own
+    if (variableDecs.length >= 1 && variableDecs[0].declarations.length === 1) {
+      const dec = variableDecs[0].declarations[0];
+      if (
+        n.VariableDeclarator.check(dec) &&
+        n.ObjectExpression.check(dec.init)
+      ) {
+        return makeModuleMap(dec.init);
+      }
+    }
   }
 
-  return makeModuleMap();
+  throw new Error(`Failed to locate module map in chunk ${name}`);
 }
 
-function findAdditionalChunkModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
+function findAdditionalChunkModuleMap({
+  ast,
+  name,
+}: WebpackChunk): WebpackModuleMap {
   // look for a single expression program with a .push(arg) - could tighten this up but seems to get the job done for now
   if (isSingleExpressionProgram(ast.program.body)) {
     const call = ast.program.body[ast.program.body.length - 1];
@@ -220,7 +225,7 @@ function findAdditionalChunkModuleMap({ ast }: WebpackChunk): WebpackModuleMap {
     }
   }
 
-  return makeModuleMap();
+  throw new Error(`Failed to locate module map in chunk ${name}`);
 }
 
 // codemod the webpack module functions and write to disk
@@ -289,10 +294,8 @@ async function writeRuntimeChunk(
   );
 
   const { code } = recast.prettyPrint(ast.program, recastOpts);
-  await fs.writeFile(
-    path.join(outDir, `${name.slice(0, -path.extname(name).length)}.${ext}`),
-    code
-  );
+  const outFile = `${name.slice(0, -path.extname(name).length)}.${ext}`;
+  await fs.writeFile(path.join(outDir, outFile), code);
 }
 
 export async function writeAdditionalChunks(
@@ -320,9 +323,8 @@ export async function writeAdditionalChunks(
     replaceAstNodes(ast.program, new Map([[moduleMapExpr, newModuleMapExpr]]));
 
     const outputCode = recast.prettyPrint(ast.program, recastOpts).code;
-    promises.push(
-      fs.writeFile(path.join(outDir, `${name}.${ext}`), outputCode)
-    );
+    const outFile = `${name.slice(0, -path.extname(name).length)}.${ext}`;
+    promises.push(fs.writeFile(path.join(outDir, outFile), outputCode));
   }
 
   await Promise.all(promises);

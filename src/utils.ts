@@ -164,7 +164,23 @@ export function makeModuleMap(expr?: r.ASTNode): WebpackModuleMap {
         result.modules[i.toString()] = fn;
       }
     }
+  } else {
+    throw new Error(
+      `Cannot construct module map from node of type ${expr?.type}`
+    );
   }
 
   return result;
+}
+
+export function maybeUnwrapTopLevelIife(program: r.Program): r.Statement[] {
+  // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
+  if (isSingleExpressionProgram(program.body)) {
+    const iife = program.body[program.body.length - 1];
+    if (isIIFE(iife) && n.BlockStatement.check(iife.expression.callee.body)) {
+      return iife.expression.callee.body.body;
+    }
+  }
+
+  return program.body;
 }
