@@ -4,6 +4,7 @@
   "description": "Utilities to reverse-engineer built webpack bundles.",
   "main": "dist/index.js",
   "bin": "dist/index.js",
+  "packageManager": "pnpm@8.15.4",
   "files": [
     "dist/"
   ],
@@ -15,9 +16,11 @@
     "deobsfuscator"
   ],
   "scripts": {
-    "dev": "esbuild src/index.ts --bundle --platform=node --packages=external --outdir=dist --watch",
-    "prepack": "tsc",
-    "build-all-examples": "node example-builder.js build-all"
+    "dev": "pnpm build --watch",
+    "prepack": "pnpm build",
+    "build": "esbuild src/index.ts --bundle --platform=node --packages=external --outdir=dist",
+    "examples:build-all": "node example-builder.js build-all",
+    "examples:build": "node example-builder.js build"
   },
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",

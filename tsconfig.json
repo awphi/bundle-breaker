@@ -2,7 +2,6 @@
   "compilerOptions": {
     "module": "Node16",
     "target": "ESNext",
-    "outDir": "dist",
     "moduleResolution": "Node16",
     "resolveJsonModule": true,
     "skipLibCheck": false
