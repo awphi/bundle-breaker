@@ -16,7 +16,7 @@ async function unbundle(
   const outDir = path.resolve(baseOutDir);
 
   const bundle = await makeBundle(inDir, options.entry);
-  const fileNames = [...bundle.files.keys()];
+  const fileNames = [...bundle.chunks.keys()];
   console.log(`Loaded ${fileNames.length} file(s) from ${inDir}.`);
   console.log(` - Files (${fileNames.length}): ${fileNames.join(", ")}`);
   console.log(` - Runtime Chunk: ${bundle.runtimeChunkInfo.chunk.name}`);

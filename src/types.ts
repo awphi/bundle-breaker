@@ -1,12 +1,11 @@
 import * as recast from "recast";
 import r = recast.types.namedTypes;
 
-export interface Chunk {
+export interface WebpackChunk {
   name: string;
   code: string;
-  ast: {
-    program: r.Program;
-  };
+  ast: r.File;
+  moduleMap?: WebpackModuleMap;
 }
 
 export type AnyFunctionExpression =
@@ -23,28 +22,27 @@ export interface IifeExpression extends r.ExpressionStatement {
 
 export interface WebpackModuleMap {
   modules: Record<string, AnyFunctionExpression>;
-  expr: r.ObjectExpression | r.ArrayExpression | undefined;
+  moduleMapExpr: r.ObjectExpression | r.ArrayExpression | undefined;
 }
 
 export interface WebpackRuntimeChunkInfo {
-  chunk: Chunk;
+  chunk: WebpackChunk;
   requireFn: WebpackRequireFnInfo;
-  moduleMap: WebpackModuleMap;
 }
 
 export interface WebpackRequireFnInfo {
-  declaration: r.FunctionDeclaration;
+  functionDec: r.FunctionDeclaration;
   moduleMapMemberExpr: r.MemberExpression;
 }
 
 export interface WebpackModule {
   fn: AnyFunctionExpression;
   name: string;
-  sourceFile: string;
+  src: string;
 }
 
 export interface WebpackBundle {
-  files: Map<string, Chunk>;
+  chunks: Map<string, WebpackChunk>;
   size: number;
   runtimeChunkInfo: WebpackRuntimeChunkInfo;
   modules: Map<string, WebpackModule>;
