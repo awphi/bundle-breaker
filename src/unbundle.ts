@@ -8,8 +8,25 @@ import type {
   WebpackRuntimeChunkInfo,
 } from "./types";
 import * as recast from "recast";
+import { parse as acornParse } from "acorn";
 
-const recastOpts: recast.Options = { tabWidth: 2 };
+const recastOpts: recast.Options = {
+  tabWidth: 2,
+  parser: {
+    parse(source: string) {
+      return acornParse(source, {
+        allowHashBang: true,
+        allowImportExportEverywhere: true,
+        allowReturnOutsideFunction: true,
+        ecmaVersion: 8,
+        sourceType: "module",
+        // turning locations off makes recast significantly faster when copying the original AST
+        // hwoever, it means we cannot use recast.print and instead must use recast.prettyPrint
+        locations: false,
+      });
+    },
+  },
+};
 const modulesDirName = "./modules";
 
 import r = recast.types.namedTypes;
@@ -65,7 +82,7 @@ export async function makeBundle(
           const code = content.toString();
           chunks.set(name, {
             code,
-            ast: recast.parse(code),
+            ast: recast.parse(code, recastOpts),
             name: name,
           });
           size += content.byteLength;
@@ -272,7 +289,7 @@ async function writeRuntimeChunk(
   } = chunk;
 
   const modules: [string, r.Literal][] = [...bundle.modules.entries()].map(
-    ([k, m]) => [k, b.literal(path.join(modulesDirName, `${m.name}.${ext}`))]
+    ([k, m]) => [k, b.literal(`${modulesDirName}/${m.name}.${ext}`)]
   );
   const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
     ? b.arrayExpression(modules.map(([_, v]) => v))

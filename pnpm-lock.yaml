@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      acorn:
+        specifier: ^8.11.3
+        version: 8.11.3
       commander:
         specifier: ^12.0.0
         version: 12.0.0
@@ -874,7 +877,6 @@ packages:
     resolution: {integrity: sha512-Y9rRfJG5jcKOE0CLisYbojUjIrIEE7AGMzA/Sm4BslANhbS+cDMpgBdcPT91oJ7OuJ9hYJBx59RjbhxVnrF8Xg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
-    dev: true
 
   /ajv-errors@1.0.1(ajv@6.12.6):
     resolution: {integrity: sha512-DCRfO/4nQ+89p/RK43i8Ezd41EqdGIU4ld7nGF8OQ14oc/we5rEntLCUa7+jrn3nn83BosfwZA0wb4pon2o8iQ==}
