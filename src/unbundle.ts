@@ -185,8 +185,8 @@ function findEntryModuleMap({ ast, name }: WebpackChunk): WebpackModuleMap {
       n.VariableDeclaration.check(v)
     ) as r.VariableDeclaration[];
 
-    // assumes the __webpack_modules__ declaration comes first and is on its own
-    if (variableDecs.length >= 1 && variableDecs[0].declarations.length === 1) {
+    // assumes the __webpack_modules__ declaration always comes first
+    if (variableDecs.length >= 1 && variableDecs[0].declarations.length >= 1) {
       const dec = variableDecs[0].declarations[0];
       if (
         n.VariableDeclarator.check(dec) &&

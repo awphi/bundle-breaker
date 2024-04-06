@@ -1,11 +1,3 @@
-# Core
-
-- [ ] Change the codescanning to work with webpack 4 and 5 bundles:
-  - [x] Locate the require fn by looking for the something[e].call(a,b,c,d) in a function def. Could tighten this later.
-  - [x] Re-use the above logic for determining runtime chunk
-  - [ ] Find additional module maps via a chunk with a single .push() call in it (only works for chunkFormat: 'array-push' in WP5)
-  - [ ] Find runtime chunk module map by checking if IIFE and is IIFE args are full - if true then we've got a WP4 style chunk, else WP5
-
 # Test case ideas
 
 - [x] Chunk splitting

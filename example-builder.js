@@ -16,7 +16,7 @@ function getBuildCommand(type) {
     }
 
     return {
-      command: "npx",
+      command: process.platform === "win32" ? "npx.cmd" : "npx",
       args: ["webpack", "-c", "./webpack.config.js"],
       env,
     };
