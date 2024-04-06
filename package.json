@@ -18,7 +18,7 @@
   "scripts": {
     "dev": "pnpm build --watch",
     "prepack": "pnpm build",
-    "build": "esbuild src/index.ts --bundle --platform=node --packages=external --outdir=dist",
+    "build": "tsc",
     "examples:build-all": "node example-builder.js build-all",
     "examples:build": "node example-builder.js build"
   },
@@ -27,11 +27,11 @@
   "dependencies": {
     "acorn": "^8.11.3",
     "commander": "^12.0.0",
-    "recast": "^0.23.6"
+    "recast": "^0.23.6",
+    "tslib": "^2.6.2"
   },
   "devDependencies": {
     "@types/node": "20.11.0",
-    "esbuild": "^0.20.2",
     "typescript": "^5.4.2"
   }
 }

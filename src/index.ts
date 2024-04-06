@@ -2,9 +2,10 @@
 import { Command } from "commander";
 import { makeBundle, writeBundle } from "./unbundle";
 import path from "path";
-import { version, description, name } from "../package.json";
 import { formatBytes } from "./utils";
 
+// use require() to prevent tsc copying package.json into the dist/ folder when building
+const { version, description, name } = require("../package.json");
 const program = new Command();
 
 async function unbundle(
