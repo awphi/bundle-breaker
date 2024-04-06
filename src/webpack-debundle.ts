@@ -126,7 +126,7 @@ function makeModuleMap(expr?: r.ASTNode): WebpackModuleMap {
   return result;
 }
 
-function findEntryModuleMap({ ast, name }: Chunk): WebpackModuleMap {
+function findRuntimeChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
   const maybeIife = ast.program.body[ast.program.body.length - 1];
   if (
     isSingleExpressionProgram(ast.program.body) &&
@@ -184,29 +184,31 @@ function findAdditionalChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
 
 export async function createDebundle(
   dir: string,
-  entryIn?: string
+  runtimeChunkIn?: string
 ): Promise<Debundle> {
-  const bundle = await createEmptyDebundleFromDir(dir);
+  const deb = await createEmptyDebundleFromDir(dir);
 
   const potentitalRuntimeChunks =
-    entryIn && bundle.chunks.has(entryIn)
-      ? [bundle.chunks.get(entryIn)].values()
-      : bundle.chunks.values();
+    runtimeChunkIn && deb.chunks.has(runtimeChunkIn)
+      ? [deb.chunks.get(runtimeChunkIn)].values()
+      : deb.chunks.values();
   const runtimeChunkInfo = findRuntimeChunk(potentitalRuntimeChunks);
+  const runtimeChunkModuleMap = findRuntimeChunkModuleMap(
+    runtimeChunkInfo.chunk
+  );
 
-  for (const chunk of bundle.chunks.values()) {
-    const { name, ast } = chunk;
+  for (const chunk of deb.chunks.values()) {
+    const { name } = chunk;
     const isRuntimeChunk = chunk === runtimeChunkInfo.chunk;
-    const findModuleMapFn = isRuntimeChunk
-      ? findEntryModuleMap
-      : findAdditionalChunkModuleMap;
-    const { moduleFns, moduleMapExpr } = findModuleMapFn(chunk);
+    const { moduleFns, moduleMapExpr } = isRuntimeChunk
+      ? runtimeChunkModuleMap
+      : findAdditionalChunkModuleMap(chunk);
 
     for (const [moduleId, moduleFn] of Object.entries(moduleFns)) {
-      if (bundle.modules.has(moduleId)) {
+      if (deb.modules.has(moduleId)) {
         throw new Error(
           `Encountered module ID clash '${moduleId}' - found in ${
-            bundle.modules.get(moduleId).src
+            deb.modules.get(moduleId).src
           } and ${name}.`
         );
       }
@@ -214,7 +216,7 @@ export async function createDebundle(
       // TODO is re-hashing the key the most efficient way to make it URL compliant?
       const hash = createHash("shake256", { outputLength: 4 });
       hash.update(moduleId);
-      bundle.modules.set(moduleId, {
+      deb.modules.set(moduleId, {
         // TODO optional content-based naming via heuristic static analysis - does't have to be very accurate just decent
         name: hash.digest("base64url"),
         ast: b.program([
@@ -226,30 +228,7 @@ export async function createDebundle(
       });
     }
 
-    if (isRuntimeChunk) {
-      const { moduleMapMemberExpr } = runtimeChunkInfo.requireFn;
-      const modulesBase: [string, r.Literal][] = [
-        ...bundle.modules.entries(),
-      ].map(([k, m]) => [k, b.literal(`${modulesDirName}/${m.name}`)]);
-      const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
-        ? b.arrayExpression(modulesBase.map(([_, v]) => v))
-        : b.objectExpression(
-            modulesBase.map(([k, v]) => b.property("init", b.literal(k), v))
-          );
-
-      replaceAstNodes(
-        ast.program,
-        new Map<r.Node, r.Node>([
-          // replace the module map member expression in the require function with require(...)
-          [
-            moduleMapMemberExpr,
-            b.callExpression(b.identifier("require"), [moduleMapMemberExpr]),
-          ],
-          // replace the actual module map expression with our mapping from module ID -> file name
-          [moduleMapExpr, newModuleMapExpr],
-        ])
-      );
-    } else {
+    if (!isRuntimeChunk) {
       const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
         ? b.arrayExpression([])
         : b.objectExpression([]);
@@ -263,5 +242,34 @@ export async function createDebundle(
     }
   }
 
-  return bundle;
+  // now that all the modules have been collected we can codemod the module map expression in the runtime chunk
+  const moduleEntries: [string, string][] = [...deb.modules.entries()].map(
+    ([k, m]) => [k, `${modulesDirName}/${m.name}`]
+  );
+  const { moduleMapMemberExpr: runtimeModuleMapMemberExpr } =
+    runtimeChunkInfo.requireFn;
+  const newRuntimeModuleMapMemberExpr = n.ArrayExpression.check(
+    runtimeModuleMapMemberExpr
+  )
+    ? b.arrayExpression(moduleEntries.map(([_, v]) => b.literal(v)))
+    : b.objectExpression(
+        moduleEntries.map(([k, v]) =>
+          b.property("init", b.literal(k), b.literal(v))
+        )
+      );
+
+  replaceAstNodes(
+    runtimeChunkInfo.chunk.ast.program,
+    new Map<r.Node, r.Node>([
+      // replace the module map member expression in the require function with require(...)
+      [
+        runtimeModuleMapMemberExpr,
+        b.callExpression(b.identifier("require"), [runtimeModuleMapMemberExpr]),
+      ],
+      // replace the actual module map expression with our mapping from module ID -> file name
+      [runtimeModuleMapMemberExpr, newRuntimeModuleMapMemberExpr],
+    ])
+  );
+
+  return deb;
 }
