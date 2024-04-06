@@ -59,7 +59,7 @@ const program = new Command();
 
 program
   .name("example-builder")
-  .description("Builds test bundles for webpack-unbundle.");
+  .description("Builds test bundles for bundle-breaker.");
 
 program
   .command("build")

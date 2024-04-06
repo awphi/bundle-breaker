@@ -2,16 +2,35 @@ import path from "path";
 import fs from "fs/promises";
 import type {
   AnyFunctionExpression,
+  Debundle,
   IifeExpression,
   WebpackModuleMap,
 } from "./types";
 import * as recast from "recast";
-
-const urlAlphabet =
-  "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
+import { parse as acornParse } from "acorn";
 
 import r = recast.types.namedTypes;
 const n = recast.types.namedTypes;
+
+export const modulesDirName = "./modules";
+
+export const recastOpts: recast.Options = {
+  tabWidth: 2,
+  parser: {
+    parse(source: string) {
+      return acornParse(source, {
+        allowHashBang: true,
+        allowImportExportEverywhere: true,
+        allowReturnOutsideFunction: true,
+        ecmaVersion: 8,
+        sourceType: "module",
+        // turning locations off makes recast significantly faster when copying the original AST
+        // hwoever, it means we cannot use recast.print and instead must use recast.prettyPrint
+        locations: false,
+      });
+    },
+  },
+};
 
 export function isAnyFunctionExpression(
   node: r.ASTNode
@@ -139,40 +158,6 @@ export function replaceAstNodes(
   });
 }
 
-export function makeModuleMap(expr?: r.ASTNode): WebpackModuleMap {
-  const result: WebpackModuleMap = {
-    moduleMapExpr: undefined,
-    modules: {},
-  };
-
-  if (n.ObjectExpression.check(expr)) {
-    result.moduleMapExpr = expr;
-    for (const prop of expr.properties) {
-      if (
-        n.Property.check(prop) &&
-        n.Literal.check(prop.key) &&
-        isAnyFunctionExpression(prop.value)
-      ) {
-        result.modules[prop.key.value.toString()] = prop.value;
-      }
-    }
-  } else if (n.ArrayExpression.check(expr)) {
-    result.moduleMapExpr = expr;
-    for (let i = 0; i < expr.elements.length; i++) {
-      const fn = expr.elements[i];
-      if (isAnyFunctionExpression(fn)) {
-        result.modules[i.toString()] = fn;
-      }
-    }
-  } else {
-    throw new Error(
-      `Cannot construct module map from node of type ${expr?.type}`
-    );
-  }
-
-  return result;
-}
-
 export function maybeUnwrapTopLevelIife(program: r.Program): r.Statement[] {
   // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
   if (isSingleExpressionProgram(program.body)) {
@@ -183,4 +168,36 @@ export function maybeUnwrapTopLevelIife(program: r.Program): r.Statement[] {
   }
 
   return program.body;
+}
+
+export async function createEmptyDebundleFromDir(
+  dir: string
+): Promise<Debundle> {
+  await ensureDirectory(dir, false, false);
+  const fileNames = await fs.readdir(dir);
+
+  if (fileNames.length === 0) {
+    throw new Error(`Directory '${dir}' is empty.`);
+  }
+
+  const chunks: Debundle["chunks"] = new Map();
+  let size: number = 0;
+
+  await Promise.all(
+    fileNames.map(async (name) => {
+      try {
+        await fs.readFile(path.join(dir, name)).then((content) => {
+          const code = content.toString();
+          chunks.set(name, {
+            code,
+            ast: recast.parse(code, recastOpts),
+            name: name,
+          });
+          size += content.byteLength;
+        });
+      } catch (e) {}
+    })
+  );
+
+  return { chunks, size, modules: new Map() };
 }

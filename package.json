@@ -1,5 +1,5 @@
 {
-  "name": "webpack-unbundle",
+  "name": "bundle-breaker",
   "version": "0.1.0",
   "description": "Utilities to reverse-engineer built webpack bundles.",
   "main": "dist/index.js",

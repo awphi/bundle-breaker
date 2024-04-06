@@ -1,5 +1,5 @@
 {
-  "name": "@webpack-unbundle/webpack4",
+  "name": "@bundle-breaker/webpack4",
   "private": true,
   "scripts": {},
   "author": "awphi (adamw.ph)",
