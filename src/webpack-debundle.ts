@@ -5,11 +5,8 @@ import type {
   WebpackRequireFnInfo,
   WebpackRuntimeChunkInfo,
 } from "./types";
-import * as recast from "recast";
-import r = recast.types.namedTypes;
 import {
   isIIFE,
-  isSingleExpressionProgram,
   createEmptyDebundleFromDir,
   maybeUnwrapTopLevelIife,
   replaceAstNodes,
@@ -17,13 +14,12 @@ import {
   isAnyFunctionExpression,
 } from "./utils";
 import { createHash } from "crypto";
+import * as t from "@babel/types";
+import traverse from "@babel/traverse";
 
-const n = recast.types.namedTypes;
-const b = recast.types.builders;
-
-const moduleExportsExpr = b.memberExpression(
-  b.identifier("module"),
-  b.identifier("exports")
+const moduleExportsExpr = t.memberExpression(
+  t.identifier("module"),
+  t.identifier("exports")
 );
 
 function findRuntimeChunk(
@@ -44,13 +40,13 @@ function findRuntimeChunk(
 }
 
 function findWebpackRequireFn({ ast, name }: Chunk): WebpackRequireFnInfo {
-  let functionDec: r.FunctionDeclaration | undefined = undefined;
-  let moduleMapMemberExpr: r.MemberExpression | undefined = undefined;
+  let functionDec: t.FunctionDeclaration | undefined = undefined;
+  let moduleMapMemberExpr: t.MemberExpression | undefined = undefined;
   const body = maybeUnwrapTopLevelIife(ast.program);
 
   const functionDecs = body.filter((v) =>
-    n.FunctionDeclaration.check(v)
-  ) as r.FunctionDeclaration[];
+    t.isFunctionDeclaration(v)
+  ) as t.FunctionDeclaration[];
 
   // most bundles will just have one function declaration (the require fn), however some webpack4 configs with
   // runtime chunk splitting will have multiple, with the *last* function declaration being the require fn
@@ -60,25 +56,19 @@ function findWebpackRequireFn({ ast, name }: Chunk): WebpackRequireFnInfo {
     // now find the first call expression on a member expression
     // in WP5 this looks like __webpack_modules__[moduleId](module, module.exports, __webpack_require__)
     // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-    recast.visit(functionDec, {
-      visitCallExpression(path) {
-        const { node } = path;
-
-        if (n.MemberExpression.check(node.callee)) {
+    traverse.cheap(functionDec, (node) => {
+      if (t.isCallExpression(node)) {
+        if (t.isMemberExpression(node.callee)) {
           if (
-            n.MemberExpression.check(node.callee.object) &&
-            n.Identifier.check(node.callee.property) &&
-            node.callee.property.name === "call"
+            t.isMemberExpression(node.callee.object) &&
+            t.isIdentifier(node.callee.property, { name: "call" })
           ) {
             moduleMapMemberExpr = node.callee.object;
           } else {
             moduleMapMemberExpr = node.callee;
           }
-          return false;
         }
-
-        this.traverse(path);
-      },
+      }
     });
   }
 
@@ -92,24 +82,26 @@ function findWebpackRequireFn({ ast, name }: Chunk): WebpackRequireFnInfo {
   };
 }
 
-function makeModuleMap(expr?: r.ASTNode): WebpackModuleMap {
+function makeModuleMap(expr?: t.Node): WebpackModuleMap {
   const result: WebpackModuleMap = {
     moduleMapExpr: undefined,
     moduleFns: {},
   };
 
-  if (n.ObjectExpression.check(expr)) {
+  if (t.isObjectExpression(expr)) {
     result.moduleMapExpr = expr;
     for (const prop of expr.properties) {
       if (
-        n.Property.check(prop) &&
-        n.Literal.check(prop.key) &&
+        t.isProperty(prop) &&
+        t.isLiteral(prop.key) &&
+        (prop.key.type === "StringLiteral" ||
+          prop.key.type === "NumericLiteral") &&
         isAnyFunctionExpression(prop.value)
       ) {
         result.moduleFns[prop.key.value.toString()] = prop.value;
       }
     }
-  } else if (n.ArrayExpression.check(expr)) {
+  } else if (t.isArrayExpression(expr)) {
     result.moduleMapExpr = expr;
     for (let i = 0; i < expr.elements.length; i++) {
       const fn = expr.elements[i];
@@ -127,9 +119,9 @@ function makeModuleMap(expr?: r.ASTNode): WebpackModuleMap {
 }
 
 function findRuntimeChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
-  const maybeIife = ast.program.body[ast.program.body.length - 1];
+  const maybeIife = ast.program.body[0];
   if (
-    isSingleExpressionProgram(ast.program.body) &&
+    ast.program.body.length === 1 &&
     isIIFE(maybeIife) &&
     maybeIife.expression.arguments.length == 1
   ) {
@@ -139,16 +131,13 @@ function findRuntimeChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
     // webpack 5 - there exists a __webpack_modules__ variable in the body
     const body = maybeUnwrapTopLevelIife(ast.program);
     const variableDecs = body.filter((v) =>
-      n.VariableDeclaration.check(v)
-    ) as r.VariableDeclaration[];
+      t.isVariableDeclaration(v)
+    ) as t.VariableDeclaration[];
 
     // assumes the __webpack_modules__ declaration always comes first
     if (variableDecs.length >= 1 && variableDecs[0].declarations.length >= 1) {
       const dec = variableDecs[0].declarations[0];
-      if (
-        n.VariableDeclarator.check(dec) &&
-        n.ObjectExpression.check(dec.init)
-      ) {
+      if (t.isVariableDeclarator(dec) && t.isObjectExpression(dec.init)) {
         return makeModuleMap(dec.init);
       }
     }
@@ -159,21 +148,20 @@ function findRuntimeChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
 
 function findAdditionalChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
   // look for a single expression program with a .push(arg) - could tighten this up but seems to get the job done for now
-  if (isSingleExpressionProgram(ast.program.body)) {
-    const call = ast.program.body[ast.program.body.length - 1];
+  if (ast.program.body.length === 1) {
+    const call = ast.program.body[0];
     if (
-      n.ExpressionStatement.check(call) &&
-      n.CallExpression.check(call.expression) &&
+      t.isExpressionStatement(call) &&
+      t.isCallExpression(call.expression) &&
       call.expression.arguments.length === 1 &&
-      n.MemberExpression.check(call.expression.callee) &&
-      n.Identifier.check(call.expression.callee.property) &&
-      call.expression.callee.property.name === "push"
+      t.isMemberExpression(call.expression.callee) &&
+      t.isIdentifier(call.expression.callee.property, { name: "push" })
     ) {
       const param = call.expression.arguments[0];
 
       // webpack 4 uses 3 args and webpack 5 uses 2 - the second is always the actual module map (arr or obj)
       // this check is quite loose for brevity but could be tightened
-      if (n.ArrayExpression.check(param) && param.elements.length >= 2) {
+      if (t.isArrayExpression(param) && param.elements.length >= 2) {
         return makeModuleMap(param.elements[1]);
       }
     }
@@ -188,14 +176,15 @@ export async function createDebundle(
 ): Promise<Debundle> {
   const deb = await createEmptyDebundleFromDir(dir);
 
-  const potentitalRuntimeChunks =
+  const potentialRuntimeChunks =
     runtimeChunkIn && deb.chunks.has(runtimeChunkIn)
       ? [deb.chunks.get(runtimeChunkIn)].values()
       : deb.chunks.values();
-  const runtimeChunkInfo = findRuntimeChunk(potentitalRuntimeChunks);
+  const runtimeChunkInfo = findRuntimeChunk(potentialRuntimeChunks);
   const runtimeChunkModuleMap = findRuntimeChunkModuleMap(
     runtimeChunkInfo.chunk
   );
+  const allModuleMapExprs: (t.ArrayExpression | t.ObjectExpression)[] = [];
 
   for (const chunk of deb.chunks.values()) {
     const { name } = chunk;
@@ -203,6 +192,7 @@ export async function createDebundle(
     const { moduleFns, moduleMapExpr } = isRuntimeChunk
       ? runtimeChunkModuleMap
       : findAdditionalChunkModuleMap(chunk);
+    allModuleMapExprs.push(moduleMapExpr);
 
     for (const [moduleId, moduleFn] of Object.entries(moduleFns)) {
       if (deb.modules.has(moduleId)) {
@@ -219,9 +209,9 @@ export async function createDebundle(
       deb.modules.set(moduleId, {
         // TODO optional content-based naming via heuristic static analysis - does't have to be very accurate just decent
         name: hash.digest("base64url"),
-        ast: b.program([
-          b.expressionStatement(
-            b.assignmentExpression("=", moduleExportsExpr, moduleFn)
+        ast: t.program([
+          t.expressionStatement(
+            t.assignmentExpression("=", moduleExportsExpr, moduleFn)
           ),
         ]),
         src: chunk,
@@ -229,12 +219,12 @@ export async function createDebundle(
     }
 
     if (!isRuntimeChunk) {
-      const newModuleMapExpr = n.ArrayExpression.check(moduleMapExpr)
-        ? b.arrayExpression([])
-        : b.objectExpression([]);
+      const newModuleMapExpr = t.isArrayExpression(moduleMapExpr)
+        ? t.arrayExpression([])
+        : t.objectExpression([]);
 
       replaceAstNodes(
-        chunk.ast.program,
+        chunk.ast,
         // replace the module map in the additional chunk with an empty expression of the same type
         // this ensures chunks are still loaded the same, but modules are not as they are split out
         new Map([[moduleMapExpr, newModuleMapExpr]])
@@ -248,26 +238,28 @@ export async function createDebundle(
   );
   const { moduleMapMemberExpr: runtimeModuleMapMemberExpr } =
     runtimeChunkInfo.requireFn;
-  const newRuntimeModuleMapMemberExpr = n.ArrayExpression.check(
-    runtimeModuleMapMemberExpr
+  const { moduleMapExpr: runtimeModuleMapExpr } = runtimeChunkModuleMap;
+
+  const newRuntimeModuleMapExpr = allModuleMapExprs.every((v) =>
+    t.isArrayExpression(v)
   )
-    ? b.arrayExpression(moduleEntries.map(([_, v]) => b.literal(v)))
-    : b.objectExpression(
+    ? t.arrayExpression(moduleEntries.map(([_, v]) => t.stringLiteral(v)))
+    : t.objectExpression(
         moduleEntries.map(([k, v]) =>
-          b.property("init", b.literal(k), b.literal(v))
+          t.objectProperty(t.stringLiteral(k), t.stringLiteral(v))
         )
       );
 
   replaceAstNodes(
-    runtimeChunkInfo.chunk.ast.program,
-    new Map<r.Node, r.Node>([
+    runtimeChunkInfo.chunk.ast,
+    new Map<t.Node, t.Node>([
       // replace the module map member expression in the require function with require(...)
       [
         runtimeModuleMapMemberExpr,
-        b.callExpression(b.identifier("require"), [runtimeModuleMapMemberExpr]),
+        t.callExpression(t.identifier("require"), [runtimeModuleMapMemberExpr]),
       ],
       // replace the actual module map expression with our mapping from module ID -> file name
-      [runtimeModuleMapMemberExpr, newRuntimeModuleMapMemberExpr],
+      [runtimeModuleMapExpr, newRuntimeModuleMapExpr],
     ])
   );
 

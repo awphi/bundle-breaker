@@ -1,50 +1,24 @@
 import path from "path";
 import fs from "fs/promises";
-import type {
-  AnyFunctionExpression,
-  Debundle,
-  IifeExpression,
-  WebpackModuleMap,
-} from "./types";
-import * as recast from "recast";
-import { parse as acornParse } from "acorn";
+import type { AnyFunctionExpression, Debundle, IifeExpression } from "./types";
+import * as parser from "@babel/parser";
 
-import r = recast.types.namedTypes;
-const n = recast.types.namedTypes;
+import traverse, { NodePath } from "@babel/traverse";
+import * as t from "@babel/types";
 
 export const modulesDirName = "./modules";
 
-export const recastOpts: recast.Options = {
-  tabWidth: 2,
-  parser: {
-    parse(source: string) {
-      return acornParse(source, {
-        allowHashBang: true,
-        allowImportExportEverywhere: true,
-        allowReturnOutsideFunction: true,
-        ecmaVersion: 8,
-        sourceType: "module",
-        // turning locations off makes recast significantly faster when copying the original AST
-        // hwoever, it means we cannot use recast.print and instead must use recast.prettyPrint
-        locations: false,
-      });
-    },
-  },
-};
-
 export function isAnyFunctionExpression(
-  node: r.ASTNode
-): node is AnyFunctionExpression {
-  return (
-    n.FunctionExpression.check(node) || n.ArrowFunctionExpression.check(node)
-  );
+  node: t.Node
+): node is t.FunctionExpression | t.ArrowFunctionExpression {
+  return t.isFunctionExpression(node) || t.isArrowFunctionExpression(node);
 }
 
-export function isIIFE(node: r.ASTNode): node is IifeExpression {
-  if (n.ExpressionStatement.check(node)) {
-    if (n.UnaryExpression.check(node.expression)) {
+export function isIIFE(node: t.Node): node is IifeExpression {
+  if (t.isExpressionStatement(node)) {
+    if (t.isUnaryExpression(node.expression)) {
       return isIIFE(node.expression.argument);
-    } else if (n.CallExpression.check(node.expression)) {
+    } else if (t.isCallExpression(node.expression)) {
       return isIIFE(node.expression);
     } else {
       return false;
@@ -52,27 +26,10 @@ export function isIIFE(node: r.ASTNode): node is IifeExpression {
   }
 
   return (
-    n.CallExpression.check(node) &&
-    isAnyFunctionExpression(node.callee) &&
-    node.callee.id == null
+    t.isCallExpression(node) &&
+    (t.isArrowFunctionExpression(node.callee) ||
+      (t.isFunctionExpression(node.callee) && node.callee.id == null))
   );
-}
-
-export function isSingleExpressionProgram(body: r.Program["body"]): boolean {
-  if (body.length === 1) {
-    return true;
-  }
-
-  if (body.length === 2) {
-    const first = body[0];
-    if ("directive" in first) {
-      return (
-        typeof first.directive === "string" && first.directive === "use strict"
-      );
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -139,30 +96,28 @@ export async function ensureDirectory(
 }
 
 export function replaceAstNodes(
-  parent: r.ASTNode,
-  replacements: Map<r.Node, r.Node>
+  parent: t.Node,
+  replacements: Map<t.Node, t.Node>
 ): void {
-  recast.visit(parent, {
-    visitNode(path) {
+  traverse(parent, {
+    enter(path) {
       if (replacements.has(path.node)) {
         const v = replacements.get(path.node);
         replacements.delete(path.node);
-        path.replace(v);
+        path.replaceWith(v);
         if (replacements.size === 0) {
-          return false;
+          path.stop();
         }
       }
-
-      this.traverse(path);
     },
   });
 }
 
-export function maybeUnwrapTopLevelIife(program: r.Program): r.Statement[] {
+export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
   // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
-  if (isSingleExpressionProgram(program.body)) {
-    const iife = program.body[program.body.length - 1];
-    if (isIIFE(iife) && n.BlockStatement.check(iife.expression.callee.body)) {
+  if (program.body.length === 1) {
+    const iife = program.body[0];
+    if (isIIFE(iife) && t.isBlockStatement(iife.expression.callee.body)) {
       return iife.expression.callee.body.body;
     }
   }
@@ -185,17 +140,22 @@ export async function createEmptyDebundleFromDir(
 
   await Promise.all(
     fileNames.map(async (name) => {
-      try {
-        await fs.readFile(path.join(dir, name)).then((content) => {
-          const code = content.toString();
-          chunks.set(name, {
-            code,
-            ast: recast.parse(code, recastOpts),
-            name: name,
-          });
-          size += content.byteLength;
+      const pth = path.join(dir, name);
+      const stat = await fs.lstat(pth);
+      if (stat.isDirectory()) {
+        return;
+      }
+
+      return fs.readFile(pth).then((content) => {
+        const code = content.toString();
+        const ast = parser.parse(code);
+        chunks.set(name, {
+          code,
+          ast,
+          name,
         });
-      } catch (e) {}
+        size += content.byteLength;
+      });
     })
   );
 

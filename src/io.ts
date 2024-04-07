@@ -1,8 +1,8 @@
 import path from "path";
 import { Debundle } from "./types";
-import { ensureDirectory, modulesDirName, recastOpts } from "./utils";
-import * as recast from "recast";
+import { ensureDirectory, modulesDirName } from "./utils";
 import fs from "fs/promises";
+import generate from "@babel/generator";
 
 export async function saveDebundle(
   outDir: string,
@@ -16,13 +16,13 @@ export async function saveDebundle(
   await ensureDirectory(moduleDir, clear);
 
   for (const { ast, name } of bundle.chunks.values()) {
-    const outputCode = recast.prettyPrint(ast.program, recastOpts).code;
+    const outputCode = generate(ast).code;
     const outFile = `${name.slice(0, -path.extname(name).length)}.${ext}`;
     promises.push(fs.writeFile(path.join(outDir, outFile), outputCode));
   }
 
   for (const { ast, name } of bundle.modules.values()) {
-    const outputCode = recast.prettyPrint(ast, recastOpts).code;
+    const outputCode = generate(ast).code;
     const outFile = `${name}.${ext}`;
     promises.push(fs.writeFile(path.join(moduleDir, outFile), outputCode));
   }

@@ -4,7 +4,7 @@
     "target": "ESNext",
     "moduleResolution": "Node16",
     "resolveJsonModule": true,
-    "skipLibCheck": false,
+    "skipLibCheck": true,
     "outDir": "dist",
     "importHelpers": true
   },

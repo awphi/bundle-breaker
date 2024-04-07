@@ -25,12 +25,16 @@
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",
   "dependencies": {
-    "acorn": "^8.11.3",
+    "@babel/generator": "^7.24.4",
+    "@babel/parser": "^7.24.4",
+    "@babel/traverse": "^7.24.1",
+    "@babel/types": "^7.24.0",
     "commander": "^12.0.0",
-    "recast": "^0.23.6",
     "tslib": "^2.6.2"
   },
   "devDependencies": {
+    "@types/babel__generator": "^7.6.8",
+    "@types/babel__traverse": "^7.20.5",
     "@types/node": "20.11.0",
     "typescript": "^5.4.2"
   }

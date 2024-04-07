@@ -1,26 +1,21 @@
-import * as recast from "recast";
-import r = recast.types.namedTypes;
+import * as t from "@babel/types";
 
 export type AnyFunctionExpression =
-  | r.ArrowFunctionExpression
-  | r.FunctionExpression;
+  | t.ArrowFunctionExpression
+  | t.FunctionExpression;
 
-export interface IifeCallExpression extends r.CallExpression {
-  callee: AnyFunctionExpression;
-}
-
-export interface IifeExpression extends r.ExpressionStatement {
-  expression: IifeCallExpression;
+export interface IifeExpression extends t.ExpressionStatement {
+  expression: t.CallExpression & { callee: AnyFunctionExpression };
 }
 
 export interface Chunk {
   name: string;
   code: string;
-  ast: r.File;
+  ast: t.File;
 }
 
 export interface Module {
-  ast: r.Program;
+  ast: t.Program;
   name: string;
   src: Chunk;
 }
@@ -32,8 +27,8 @@ export interface Debundle {
 }
 
 export interface WebpackModuleMap {
-  moduleFns: Record<string, AnyFunctionExpression>;
-  moduleMapExpr: r.ObjectExpression | r.ArrayExpression | undefined;
+  moduleFns: Record<string, t.ArrowFunctionExpression | t.FunctionExpression>;
+  moduleMapExpr: t.ObjectExpression | t.ArrayExpression | undefined;
 }
 
 export interface WebpackRuntimeChunkInfo {
@@ -42,6 +37,6 @@ export interface WebpackRuntimeChunkInfo {
 }
 
 export interface WebpackRequireFnInfo {
-  functionDec: r.FunctionDeclaration;
-  moduleMapMemberExpr: r.MemberExpression;
+  functionDec: t.FunctionDeclaration;
+  moduleMapMemberExpr: t.MemberExpression;
 }
