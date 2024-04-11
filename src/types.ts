@@ -22,7 +22,7 @@ export interface Module {
 
 export interface Debundle {
   chunks: Map<string, Chunk>;
-  size: number;
+  chunkSize: number;
   modules: Map<string, Module>;
 }
 

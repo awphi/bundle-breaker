@@ -3,14 +3,17 @@ import fs from "fs/promises";
 import type { AnyFunctionExpression, Debundle, IifeExpression } from "./types";
 import * as parser from "@babel/parser";
 
-import traverse, { NodePath } from "@babel/traverse";
+import traverse from "@babel/traverse";
 import * as t from "@babel/types";
 
 export const modulesDirName = "./modules";
+export const metaFileName = "debundle.json";
+
+const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 
 export function isAnyFunctionExpression(
   node: t.Node
-): node is t.FunctionExpression | t.ArrowFunctionExpression {
+): node is AnyFunctionExpression {
   return t.isFunctionExpression(node) || t.isArrowFunctionExpression(node);
 }
 
@@ -67,7 +70,7 @@ export function formatBytes(bytes: number, si = false, dp = 1): string {
   return bytes.toFixed(dp) + " " + units[u];
 }
 
-// ensure a directory exists, is a directory and optionall is empty
+// ensure a directory exists, is a directory, and optionally empty it or create it
 export async function ensureDirectory(
   pth: string,
   clear: boolean = false,
@@ -75,7 +78,7 @@ export async function ensureDirectory(
 ): Promise<void> {
   let exists = false;
   try {
-    const stat = await fs.lstat(pth);
+    const stat = await fs.stat(pth);
     if (!stat.isDirectory()) {
       await fs.rm(pth, { recursive: true });
     } else {
@@ -125,11 +128,20 @@ export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
   return program.body;
 }
 
+export function logDebundleInfo(debundle: Debundle): void {
+  const chunkNames = [...debundle.chunks.keys()];
+  console.log(` - Chunks (${chunkNames.length}): ${chunkNames.join(", ")}`);
+  console.log(` - Total chunk(s) size: ${formatBytes(debundle.chunkSize)}`);
+  console.log(` - Unique modules: ${debundle.modules.size}`);
+}
+
 export async function createEmptyDebundleFromDir(
   dir: string
 ): Promise<Debundle> {
   await ensureDirectory(dir, false, false);
-  const fileNames = await fs.readdir(dir);
+  const fileNames = (await fs.readdir(dir)).filter((a) =>
+    jsFileExtensions.has(path.extname(a))
+  );
 
   if (fileNames.length === 0) {
     throw new Error(`Directory '${dir}' is empty.`);
@@ -141,7 +153,7 @@ export async function createEmptyDebundleFromDir(
   await Promise.all(
     fileNames.map(async (name) => {
       const pth = path.join(dir, name);
-      const stat = await fs.lstat(pth);
+      const stat = await fs.stat(pth);
       if (stat.isDirectory()) {
         return;
       }
@@ -159,5 +171,5 @@ export async function createEmptyDebundleFromDir(
     })
   );
 
-  return { chunks, size, modules: new Map() };
+  return { chunks, chunkSize: size, modules: new Map() };
 }
