@@ -12,6 +12,7 @@ export interface Chunk {
   name: string;
   code: string;
   ast: t.File;
+  bytes: number;
 }
 
 export interface Module {
@@ -20,23 +21,16 @@ export interface Module {
   src: Chunk;
 }
 
-export interface Debundle {
-  chunks: Map<string, Chunk>;
-  chunkSize: number;
-  modules: Map<string, Module>;
+// https://github.com/jsongraph/json-graph-specification
+export interface GraphEdge<T extends object> {
+  source: string;
+  target: string;
+  label?: string;
+  directed?: boolean;
+  metadata?: T;
 }
 
-export interface WebpackModuleMap {
-  moduleFns: Record<string, t.ArrowFunctionExpression | t.FunctionExpression>;
-  moduleMapExpr: t.ObjectExpression | t.ArrayExpression | undefined;
-}
-
-export interface WebpackRuntimeChunkInfo {
-  chunk: Chunk;
-  requireFn: WebpackRequireFnInfo;
-}
-
-export interface WebpackRequireFnInfo {
-  functionDec: t.FunctionDeclaration;
-  moduleMapMemberExpr: t.MemberExpression;
+export interface Graph<V extends object, E extends object> {
+  nodes: Record<string, V>;
+  edges: GraphEdge<E>[];
 }

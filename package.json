@@ -1,9 +1,9 @@
 {
   "name": "bundle-breaker",
   "version": "0.1.0",
-  "description": "Utilities to reverse-engineer built webpack bundles.",
+  "description": "Utilities to reverse-engineer bundled/obfuscated JS applications.",
   "main": "dist/index.js",
-  "bin": "dist/index.js",
+  "bin": "dist/cli.js",
   "packageManager": "pnpm@8.15.4",
   "files": [
     "dist/"

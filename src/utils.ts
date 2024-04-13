@@ -1,15 +1,9 @@
 import path from "path";
 import fs from "fs/promises";
-import type { AnyFunctionExpression, Debundle, IifeExpression } from "./types";
-import * as parser from "@babel/parser";
+import type { AnyFunctionExpression, IifeExpression } from "./types";
 
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
-
-export const modulesDirName = "./modules";
-export const metaFileName = "debundle.json";
-
-const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 
 export function isAnyFunctionExpression(
   node: t.Node
@@ -126,50 +120,4 @@ export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
   }
 
   return program.body;
-}
-
-export function logDebundleInfo(debundle: Debundle): void {
-  const chunkNames = [...debundle.chunks.keys()];
-  console.log(` - Chunks (${chunkNames.length}): ${chunkNames.join(", ")}`);
-  console.log(` - Total chunk(s) size: ${formatBytes(debundle.chunkSize)}`);
-  console.log(` - Unique modules: ${debundle.modules.size}`);
-}
-
-export async function createEmptyDebundleFromDir(
-  dir: string
-): Promise<Debundle> {
-  await ensureDirectory(dir, false, false);
-  const fileNames = (await fs.readdir(dir)).filter((a) =>
-    jsFileExtensions.has(path.extname(a))
-  );
-
-  if (fileNames.length === 0) {
-    throw new Error(`Directory '${dir}' is empty.`);
-  }
-
-  const chunks: Debundle["chunks"] = new Map();
-  let size: number = 0;
-
-  await Promise.all(
-    fileNames.map(async (name) => {
-      const pth = path.join(dir, name);
-      const stat = await fs.stat(pth);
-      if (stat.isDirectory()) {
-        return;
-      }
-
-      return fs.readFile(pth).then((content) => {
-        const code = content.toString();
-        const ast = parser.parse(code);
-        chunks.set(name, {
-          code,
-          ast,
-          name,
-        });
-        size += content.byteLength;
-      });
-    })
-  );
-
-  return { chunks, chunkSize: size, modules: new Map() };
 }
