@@ -8,7 +8,7 @@ import Graph from "graphology";
 import {
   MODULES_DIR,
   isAnyFunctionExpression,
-  isIIFE,
+  getIifeCallExpression,
   maybeUnwrapTopLevelIife,
   replaceAstNodes,
 } from "./utils";
@@ -80,7 +80,9 @@ function findRuntimeChunk(
         chunk,
         requireFn,
       };
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   throw new Error("Failed to auto-detect runtime chunk.");
@@ -130,14 +132,10 @@ function findWebpackRequireFn({ ast, name }: Chunk): WebpackRequireFnInfo {
 }
 
 function findRuntimeChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
-  const maybeIife = ast.program.body[0];
-  if (
-    ast.program.body.length === 1 &&
-    isIIFE(maybeIife) &&
-    maybeIife.expression.arguments.length == 1
-  ) {
+  const iife = getIifeCallExpression(ast.program.body[0]);
+  if (ast.program.body.length === 1 && iife && iife.arguments.length == 1) {
     // webpack 4  - the modules included in the runtime chunk are passed as the first and only arg to the main iife
-    return makeModuleMap(maybeIife.expression.arguments[0]);
+    return makeModuleMap(iife.arguments[0]);
   } else {
     // webpack 5 - there exists a __webpack_modules__ variable in the body
     const body = maybeUnwrapTopLevelIife(ast.program);

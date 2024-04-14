@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
-import type { AnyFunctionExpression, IifeExpression } from "./types";
+import type { AnyFunctionExpression, IifeCallExpression } from "./types";
 
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
@@ -14,22 +14,25 @@ export function isAnyFunctionExpression(
   return t.isFunctionExpression(node) || t.isArrowFunctionExpression(node);
 }
 
-export function isIIFE(node: t.Node): node is IifeExpression {
+export function getIifeCallExpression(
+  node: t.Node
+): IifeCallExpression | undefined {
   if (t.isExpressionStatement(node)) {
-    if (t.isUnaryExpression(node.expression)) {
-      return isIIFE(node.expression.argument);
-    } else if (t.isCallExpression(node.expression)) {
-      return isIIFE(node.expression);
-    } else {
-      return false;
+    if (
+      t.isUnaryExpression(node.expression) &&
+      t.isCallExpression(node.expression.argument) &&
+      isAnyFunctionExpression(node.expression.argument.callee)
+    ) {
+      return node.expression.argument as IifeCallExpression;
+    } else if (
+      t.isCallExpression(node.expression) &&
+      isAnyFunctionExpression(node.expression.callee)
+    ) {
+      return node.expression as IifeCallExpression;
     }
   }
 
-  return (
-    t.isCallExpression(node) &&
-    (t.isArrowFunctionExpression(node.callee) ||
-      (t.isFunctionExpression(node.callee) && node.callee.id == null))
-  );
+  return undefined;
 }
 
 /**
@@ -116,9 +119,9 @@ export function replaceAstNodes(
 export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
   // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
   if (program.body.length === 1) {
-    const iife = program.body[0];
-    if (isIIFE(iife) && t.isBlockStatement(iife.expression.callee.body)) {
-      return iife.expression.callee.body.body;
+    const iife = getIifeCallExpression(program.body[0]);
+    if (t.isBlockStatement(iife.callee.body)) {
+      return iife.callee.body.body;
     }
   }
 
