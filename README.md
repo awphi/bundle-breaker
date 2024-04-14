@@ -10,13 +10,7 @@ The tool aims to be robust and tolerant to various bundler configurations. If yo
 
 ## Debundle
 
-The first step to reverse-engineering a production JS application is to undo the bundling process performed by tools like webpack and rollup. `bundle-breaker` calls this process "debundling" and is performed like so:
-
-CLI:
-
-```sh
-npx bundle-breaker debundle path/to/bundle ./out
-```
+The core function of `bundle-breaker` is to debundle, or break up, a bundled JS application into individual files each containing a singular module. This is called debundling and serves as the entry point for all interfaces with `bundle-breaker`.
 
 JS API:
 
@@ -25,11 +19,30 @@ import { debundle } from "bundle-breaker";
 
 const files = { "index.js": "...", "chunk.js": "..." };
 const deb = debundle(files);
+// use debundle API as needed, for example:
 deb.debug();
-// ...
+const graph = deb.graph();
 ```
 
-Running the command above will create a debundled copy of your original application in the `./out/` directory. This consists of a modified copy of all your original bundle chunks and the individual modules that were contained in the chunks (now separated out into their own files). `bundle-breaker` also supports a variety of advanced options to enrich this data with better naming, module graph visualizations, grouping of modules, pruning and deobfuscation. Examples of these are given in more detail below.
+CLI:
+
+```sh
+npx bundle-breaker -c path/to/bundle ./out
+```
+
+When used via the CLI, `bundle-breaker` will write your debundled application to specified directory. It will have the following structure:
+
+```
+out/
+├─ modules/
+│  ├─ bb_module_1.js
+│  ├─ bb_module_2.js
+│  ├─ bb_module_3.js
+├─ index.js
+├─ chunk_1.js
+├─ chunk_2.js
+├─ ...extra metadata. depending on options (e.g. graph.json)..
+```
 
 ## Visualize
 

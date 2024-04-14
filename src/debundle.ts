@@ -74,10 +74,5 @@ export abstract class Debundle {
     await Promise.all(promises);
   }
 
-  visualize(): void {
-    // TODO visualize this.moduleGraph using d3 etc.
-    throw new Error("Method not implemented.");
-  }
-
-  abstract graph(): void;
+  abstract graph(): Graph<any, any>;
 }

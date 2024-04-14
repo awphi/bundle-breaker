@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import * as t from "@babel/types";
 import traverse from "@babel/traverse";
 import { Debundle, modulesDirName } from "./debundle";
-import { Chunk } from "./types";
+import { Chunk, Graph } from "./types";
 import {
   isAnyFunctionExpression,
   isIIFE,
@@ -275,7 +275,7 @@ export class WebpackDebundle extends Debundle {
     );
   }
 
-  graph(): void {
+  graph(): Graph<any, any> {
     const { moduleGraph, modules } = this;
     for (const { ast, name } of this.modules.values()) {
       moduleGraph.nodes[name] = {};
@@ -314,5 +314,7 @@ export class WebpackDebundle extends Debundle {
         });
       }
     }
+
+    return moduleGraph;
   }
 }
