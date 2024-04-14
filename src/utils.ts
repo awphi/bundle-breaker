@@ -67,8 +67,8 @@ export function formatBytes(bytes: number, si = false, dp = 1): string {
 // ensure a directory exists, is a directory, and optionally empty it or create it
 export async function ensureDirectory(
   pth: string,
-  clear: boolean = false,
-  create: boolean = true
+  clear: boolean,
+  create: boolean
 ): Promise<void> {
   let exists = false;
   try {

@@ -6,11 +6,15 @@ import { Chunk, Graph, Module } from "./types";
 import { ensureDirectory, formatBytes } from "./utils";
 
 export const modulesDirName = "./modules";
+export const graphFileName = "graph.json";
 
 export abstract class Debundle {
   chunks: Map<string, Chunk> = new Map();
   modules: Map<string, Module> = new Map();
-  moduleGraph: Graph<any, any> | undefined = undefined;
+  moduleGraph: Graph<any, any> = {
+    nodes: {},
+    edges: [],
+  };
 
   constructor(chunks: Record<string, string>) {
     const textEncoder = new TextEncoder();
@@ -43,12 +47,11 @@ export abstract class Debundle {
     console.log(` - Unique modules: ${this.modules.size}`);
   }
 
-  async save(dir: string, ext: string, clear: boolean): Promise<void> {
+  async save(dir: string, ext: string): Promise<void> {
     const moduleDir = path.resolve(dir, modulesDirName);
 
     const promises: Promise<void>[] = [];
-    await ensureDirectory(dir, clear);
-    await ensureDirectory(moduleDir, clear);
+    await ensureDirectory(moduleDir, false, true);
 
     for (const { ast, name } of this.chunks.values()) {
       const outputCode = generate(ast).code;
@@ -60,6 +63,12 @@ export abstract class Debundle {
       const outputCode = generate(ast).code;
       const outFile = `${name}.${ext}`;
       promises.push(fs.writeFile(path.join(moduleDir, outFile), outputCode));
+    }
+
+    const graph = this.moduleGraph;
+    if (graph.edges.length > 0 || Object.keys(graph.nodes).length > 0) {
+      const graphStr = JSON.stringify(graph, undefined, 2);
+      promises.push(fs.writeFile(path.join(dir, graphFileName), graphStr));
     }
 
     await Promise.all(promises);

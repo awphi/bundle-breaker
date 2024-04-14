@@ -211,17 +211,18 @@ export class WebpackDebundle extends Debundle {
           );
         }
 
-        // TODO is re-hashing the key the most efficient way to make it URL compliant?
+        moduleFn.leadingComments = [];
         const hash = createHash("shake256", { outputLength: 4 });
         hash.update(moduleId);
         this.modules.set(moduleId, {
-          // TODO optional content-based naming via heuristic static analysis - does't have to be very accurate just decent
-          name: hash.digest("base64url"),
-          ast: t.program([
-            t.expressionStatement(
-              t.assignmentExpression("=", moduleExportsExpr, moduleFn)
-            ),
-          ]),
+          name: "bb_" + hash.digest("base64url"),
+          ast: t.file(
+            t.program([
+              t.expressionStatement(
+                t.assignmentExpression("=", moduleExportsExpr, moduleFn)
+              ),
+            ])
+          ),
           src: chunk,
         });
       }
@@ -275,7 +276,43 @@ export class WebpackDebundle extends Debundle {
   }
 
   graph(): void {
-    // TODO write to this.moduleGraph
-    throw new Error("Method not implemented.");
+    const { moduleGraph, modules } = this;
+    for (const { ast, name } of this.modules.values()) {
+      moduleGraph.nodes[name] = {};
+      const expr = ast.program.body[0];
+      if (
+        t.isExpressionStatement(expr) &&
+        t.isAssignmentExpression(expr.expression) &&
+        isAnyFunctionExpression(expr.expression.right) &&
+        expr.expression.right.params.length >= 3 &&
+        t.isIdentifier(expr.expression.right.params[2])
+      ) {
+        const requireFnId = expr.expression.right.params[2];
+        traverse(ast, {
+          CallExpression(path) {
+            const { callee, arguments: args } = path.node;
+            if (
+              t.isIdentifier(callee) &&
+              callee.name === requireFnId.name &&
+              path.scope.getBinding(callee.name).identifier === requireFnId &&
+              args.length === 1 &&
+              (t.isStringLiteral(args[0]) || t.isNumericLiteral(args[0]))
+            ) {
+              const realModuleId = args[0].value.toString();
+              if (!modules.has(realModuleId)) {
+                throw new Error(
+                  `Could not find module '${realModuleId}' in cache. Imported by module '${name}'.`
+                );
+              }
+              const moduleId = modules.get(realModuleId)!.name;
+              moduleGraph.edges.push({
+                source: moduleId,
+                target: name,
+              });
+            }
+          },
+        });
+      }
+    }
   }
 }

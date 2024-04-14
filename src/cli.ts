@@ -16,22 +16,21 @@ program
   .argument("<indir>", "Directory containing bundled webpack output")
   .argument("<outdir>", "Directory for the debundled output of this program")
   .option("-e, --entry <file>", "manually specify an entry file to the bundle")
-  .option("-c, --clear", "clear the output directory before writing", true)
+  .option("-c, --clear", "clear the output directory before writing")
   .option(
     "-g, --graph",
-    "produce a file representing the module graph in JSON graph format",
-    true
+    "produce a file representing the module graph in JSON graph format"
   )
   .option(
     "-v, --visualize",
-    "produce a visualization of the bundle's module graph",
-    false
+    "produce a visualization of the bundle's module graph"
   )
   .option("-ext, --extension <ext>", "file extension to use for output", "js")
   .action(async (baseInDir: string, baseOutDir: string, options: any) => {
     const inDir = path.resolve(baseInDir);
     const outDir = path.resolve(baseOutDir);
     await ensureDirectory(inDir, false, false);
+    await ensureDirectory(outDir, !!options.clear, true);
 
     const fileNames = (await fs.readdir(inDir)).filter((a) =>
       jsFileExtensions.has(path.extname(a))
@@ -52,7 +51,7 @@ program
       })
     );
 
-    const deb = debundle(files);
+    const deb = debundle(files, options.entry);
     deb.debug();
 
     // visualizing requires a graph
@@ -66,7 +65,7 @@ program
       deb.visualize();
     }
 
-    deb.save(outDir, options.extension, options.clear);
+    deb.save(outDir, options.extension);
   });
 
 program.parse();

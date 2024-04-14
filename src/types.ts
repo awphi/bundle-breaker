@@ -16,7 +16,7 @@ export interface Chunk {
 }
 
 export interface Module {
-  ast: t.Program;
+  ast: t.File;
   name: string;
   src: Chunk;
 }
