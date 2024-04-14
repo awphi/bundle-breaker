@@ -283,7 +283,7 @@ export class WebpackDebundle extends Debundle {
     const { modules } = this;
     const graph = new Graph({ allowSelfLoops: false });
     for (const { name } of this.modules.values()) {
-      graph.addNode(name);
+      graph.addNode(name, { label: name });
     }
 
     for (const { ast, name } of this.modules.values()) {

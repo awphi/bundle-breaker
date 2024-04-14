@@ -5,11 +5,13 @@ import fs from "fs/promises";
 import { Chunk, Module } from "./types";
 import { GRAPH_FILE, MODULES_DIR, ensureDirectory, formatBytes } from "./utils";
 import Graph from "graphology";
+import gexf from "graphology-gexf";
 
 export abstract class Debundle {
   protected chunks: Map<string, Chunk> = new Map();
   protected modules: Map<string, Module> = new Map();
   protected moduleGraph: Graph | undefined = undefined;
+  protected visualization: string | undefined = undefined;
 
   constructor(chunks: Record<string, string>) {
     const textEncoder = new TextEncoder();
@@ -67,17 +69,13 @@ export abstract class Debundle {
       promises.push(fs.writeFile(path.join(moduleDir, outFile), outputCode));
     }
 
-    const graph = this.moduleGraph;
+    const { moduleGraph: graph } = this;
     if (graph !== undefined) {
-      const graphStr = JSON.stringify(graph.export(), undefined, 2);
+      const graphStr = gexf.write(graph);
       promises.push(fs.writeFile(path.join(dir, GRAPH_FILE), graphStr));
     }
 
     await Promise.all(promises);
-  }
-
-  visualize(): void {
-    // TODO
   }
 
   graph(useCache: boolean = true): Graph {

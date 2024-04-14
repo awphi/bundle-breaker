@@ -29,7 +29,6 @@ const files = { "index.js": "...", "chunk.js": "..." };
 const deb = debundle(files);
 // use debundle API as needed, for example:
 deb.debug();
-const graph = deb.graph();
 ```
 
 CLI:
@@ -49,14 +48,37 @@ out/
 ├─ index.js
 ├─ chunk_1.js
 ├─ chunk_2.js
-├─ ...extra metadata. depending on options (e.g. graph.json)..
+├─ ...extra metadata. depending on options (e.g. graph.gexf)..
 ```
 
-## Visualize
+## Graph
+
+`bundle-breaker` can traverse the separates modules produced in the debundling step to look for imports/exports and build a module graph. This can be enabled like so:
+
+```javascript
+import { debundle } from "bundle-breaker";
+
+const files = { "index.js": "...", "chunk.js": "..." };
+const deb = debundle(files);
+const graph = deb.graph();
+console.log(graph.order, graph.size);
+```
+
+When using the JavaScript API `deb.graph()` will return a [graphology](https://graphology.github.io/) `Graph` object to interact with. You can use this as you would normally e.g. performing layouts, computing SNA metrics etc.
+
+CLI:
+
+```sh
+npx bundle-breaker -cg path/to/bundle ./out
+```
+
+When using the CLI you can simply append the `-g` or `--graph` option to include a [`.gexf`](https://gexf.net/) graph file in your output directory. This can be loaded into a variety of graph-analysis or visualization libraries usually with minimal transformation. However, one way to quickly visualize your module graph without writing any code is to load it into [Gephi Lite](https://gephi.org/gephi-lite/).
+
+## Name
 
 TODO
 
-## Name
+## Deobfuscate
 
 TODO
 
@@ -65,10 +87,6 @@ TODO
 TODO
 
 ## Prune
-
-TODO
-
-## Deobfuscate
 
 TODO
 

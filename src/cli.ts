@@ -17,14 +17,7 @@ program
   .argument("<outdir>", "Directory for the debundled output of this program")
   .option("-e, --entry <file>", "manually specify an entry file to the bundle")
   .option("-c, --clear", "clear the output directory before writing")
-  .option(
-    "-g, --graph",
-    "serialize the module graph in graphology format - https://graphology.github.io/serialization.html#format"
-  )
-  .option(
-    "-v, --visualize",
-    "produce a visualization of the bundle's module graph"
-  )
+  .option("-g, --graph", "serialize the module graph in GEXF format")
   .option("-ext, --extension <ext>", "file extension to use for output", "js")
   .action(async (baseInDir: string, baseOutDir: string, options: any) => {
     const inDir = path.resolve(baseInDir);
@@ -54,15 +47,8 @@ program
     const deb = debundle(files, options.entry);
     deb.debug();
 
-    // visualizing requires a graph
-    options.graph ||= options.visualize;
-
     if (options.graph) {
       deb.graph();
-    }
-
-    if (options.visualize) {
-      deb.visualize();
     }
 
     deb.save(outDir, options.extension);

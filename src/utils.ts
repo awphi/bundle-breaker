@@ -6,7 +6,7 @@ import traverse from "@babel/traverse";
 import * as t from "@babel/types";
 
 export const MODULES_DIR = "./modules";
-export const GRAPH_FILE = "graph.json";
+export const GRAPH_FILE = "graph.gexf";
 
 export function isAnyFunctionExpression(
   node: t.Node
