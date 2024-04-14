@@ -4,7 +4,15 @@ TODO npm banner
 
 `bundle-breaker` is a CLI and JS API to make reverse-engineering bundled JavaScript applications easy and accessible. This can comprise of the separation, grouping, naming, pruning, deobfuscation and rebundling of production-built JavaScript applications.
 
-The tool aims to be robust and tolerant to various bundler configurations. If you find a config that doesn't work as you'd expect and the relevant option(s) are not listed in our known limitations please raise an issue.
+The tool aims to work with to the majority bundler configurations and versions. Notably this includes:
+
+- Webpack 4 and 5
+- All `webpack.ids` plugins
+- Bundles split across multiple bundles
+- Runtime-only chunks
+- ... and everything between!
+
+If you find a config that doesn't work as you'd expect and the relevant option(s)/version(s) are not listed in the known limitations please raise an issue.
 
 # Features
 

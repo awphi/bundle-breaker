@@ -19,7 +19,7 @@ program
   .option("-c, --clear", "clear the output directory before writing")
   .option(
     "-g, --graph",
-    "produce a file representing the module graph in JSON graph format"
+    "serialize the module graph in graphology format - https://graphology.github.io/serialization.html#format"
   )
   .option(
     "-v, --visualize",

@@ -1,9 +1,12 @@
 import { createHash } from "crypto";
 import * as t from "@babel/types";
 import traverse from "@babel/traverse";
-import { Debundle, modulesDirName } from "./debundle";
-import { Chunk, Graph } from "./types";
+import { Debundle } from "./debundle";
+import { Chunk } from "./types";
+import Graph from "graphology";
+
 import {
+  MODULES_DIR,
   isAnyFunctionExpression,
   isIIFE,
   maybeUnwrapTopLevelIife,
@@ -214,15 +217,16 @@ export class WebpackDebundle extends Debundle {
         moduleFn.leadingComments = [];
         const hash = createHash("shake256", { outputLength: 4 });
         hash.update(moduleId);
+        const ast = t.file(
+          t.program([
+            t.expressionStatement(
+              t.assignmentExpression("=", moduleExportsExpr, moduleFn)
+            ),
+          ])
+        );
         this.modules.set(moduleId, {
           name: "bb_" + hash.digest("base64url"),
-          ast: t.file(
-            t.program([
-              t.expressionStatement(
-                t.assignmentExpression("=", moduleExportsExpr, moduleFn)
-              ),
-            ])
-          ),
+          ast,
           src: chunk,
         });
       }
@@ -243,7 +247,7 @@ export class WebpackDebundle extends Debundle {
 
     // now that all the modules have been collected we can codemod the module map expression in the runtime chunk
     const moduleEntries: [string, string][] = [...this.modules.entries()].map(
-      ([k, m]) => [k, `${modulesDirName}/${m.name}`]
+      ([k, m]) => [k, `${MODULES_DIR}/${m.name}`]
     );
     const { moduleMapMemberExpr: runtimeModuleMapMemberExpr } =
       runtimeChunkInfo.requireFn;
@@ -275,46 +279,45 @@ export class WebpackDebundle extends Debundle {
     );
   }
 
-  graph(): Graph<any, any> {
-    const { moduleGraph, modules } = this;
-    for (const { ast, name } of this.modules.values()) {
-      moduleGraph.nodes[name] = {};
-      const expr = ast.program.body[0];
-      if (
-        t.isExpressionStatement(expr) &&
-        t.isAssignmentExpression(expr.expression) &&
-        isAnyFunctionExpression(expr.expression.right) &&
-        expr.expression.right.params.length >= 3 &&
-        t.isIdentifier(expr.expression.right.params[2])
-      ) {
-        const requireFnId = expr.expression.right.params[2];
-        traverse(ast, {
-          CallExpression(path) {
-            const { callee, arguments: args } = path.node;
-            if (
-              t.isIdentifier(callee) &&
-              callee.name === requireFnId.name &&
-              path.scope.getBinding(callee.name).identifier === requireFnId &&
-              args.length === 1 &&
-              (t.isStringLiteral(args[0]) || t.isNumericLiteral(args[0]))
-            ) {
-              const realModuleId = args[0].value.toString();
-              if (!modules.has(realModuleId)) {
-                throw new Error(
-                  `Could not find module '${realModuleId}' in cache. Imported by module '${name}'.`
-                );
-              }
-              const moduleId = modules.get(realModuleId)!.name;
-              moduleGraph.edges.push({
-                source: moduleId,
-                target: name,
-              });
-            }
-          },
-        });
-      }
+  graphInternal(): Graph {
+    const { modules } = this;
+    const graph = new Graph({ allowSelfLoops: false });
+    for (const { name } of this.modules.values()) {
+      graph.addNode(name);
     }
 
-    return moduleGraph;
+    for (const { ast, name } of this.modules.values()) {
+      const expr = ast.program.body[0];
+      if (
+        !(
+          t.isExpressionStatement(expr) &&
+          t.isAssignmentExpression(expr.expression) &&
+          isAnyFunctionExpression(expr.expression.right) &&
+          expr.expression.right.params.length >= 3 &&
+          t.isIdentifier(expr.expression.right.params[2])
+        )
+      ) {
+        continue;
+      }
+
+      const requireFnId = expr.expression.right.params[2];
+      traverse(ast, {
+        CallExpression(path) {
+          const { callee, arguments: args } = path.node;
+          if (
+            t.isIdentifier(callee) &&
+            callee.name === requireFnId.name &&
+            path.scope.getBinding(callee.name).identifier === requireFnId &&
+            args.length === 1 &&
+            (t.isStringLiteral(args[0]) || t.isNumericLiteral(args[0]))
+          ) {
+            const moduleId = modules.get(args[0].value.toString())!.name;
+            graph.addDirectedEdge(moduleId, name);
+          }
+        },
+      });
+    }
+
+    return graph;
   }
 }

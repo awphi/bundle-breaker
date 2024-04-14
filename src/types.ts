@@ -8,29 +8,15 @@ export interface IifeExpression extends t.ExpressionStatement {
   expression: t.CallExpression & { callee: AnyFunctionExpression };
 }
 
-export interface Chunk {
+export interface NamedAST {
   name: string;
-  code: string;
   ast: t.File;
+}
+
+export interface Chunk extends NamedAST {
   bytes: number;
 }
 
-export interface Module {
-  ast: t.File;
-  name: string;
+export interface Module extends NamedAST {
   src: Chunk;
-}
-
-// https://github.com/jsongraph/json-graph-specification
-export interface GraphEdge<T extends object> {
-  source: string;
-  target: string;
-  label?: string;
-  directed?: boolean;
-  metadata?: T;
-}
-
-export interface Graph<V extends object, E extends object> {
-  nodes: Record<string, V>;
-  edges: GraphEdge<E>[];
 }

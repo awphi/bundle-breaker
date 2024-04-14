@@ -2,19 +2,14 @@ import path from "path";
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
 import fs from "fs/promises";
-import { Chunk, Graph, Module } from "./types";
-import { ensureDirectory, formatBytes } from "./utils";
-
-export const modulesDirName = "./modules";
-export const graphFileName = "graph.json";
+import { Chunk, Module } from "./types";
+import { GRAPH_FILE, MODULES_DIR, ensureDirectory, formatBytes } from "./utils";
+import Graph from "graphology";
 
 export abstract class Debundle {
-  chunks: Map<string, Chunk> = new Map();
-  modules: Map<string, Module> = new Map();
-  moduleGraph: Graph<any, any> = {
-    nodes: {},
-    edges: [],
-  };
+  protected chunks: Map<string, Chunk> = new Map();
+  protected modules: Map<string, Module> = new Map();
+  protected moduleGraph: Graph | undefined = undefined;
 
   constructor(chunks: Record<string, string>) {
     const textEncoder = new TextEncoder();
@@ -22,7 +17,6 @@ export abstract class Debundle {
       const code = chunks[name];
       const ast = parser.parse(code);
       this.chunks.set(name, {
-        code,
         ast,
         name,
         bytes: textEncoder.encode(code).byteLength,
@@ -38,6 +32,14 @@ export abstract class Debundle {
     return c;
   }
 
+  getChunk(id: string): Chunk | undefined {
+    return this.chunks.get(id);
+  }
+
+  getModule(id: string): Module | undefined {
+    return this.modules.get(id);
+  }
+
   debug(): void {
     const chunkNames = [...this.chunks.keys()];
     console.log(` - Chunks (${chunkNames.length}): ${chunkNames.join(", ")}`);
@@ -48,7 +50,7 @@ export abstract class Debundle {
   }
 
   async save(dir: string, ext: string): Promise<void> {
-    const moduleDir = path.resolve(dir, modulesDirName);
+    const moduleDir = path.resolve(dir, MODULES_DIR);
 
     const promises: Promise<void>[] = [];
     await ensureDirectory(moduleDir, false, true);
@@ -66,13 +68,26 @@ export abstract class Debundle {
     }
 
     const graph = this.moduleGraph;
-    if (graph.edges.length > 0 || Object.keys(graph.nodes).length > 0) {
-      const graphStr = JSON.stringify(graph, undefined, 2);
-      promises.push(fs.writeFile(path.join(dir, graphFileName), graphStr));
+    if (graph !== undefined) {
+      const graphStr = JSON.stringify(graph.export(), undefined, 2);
+      promises.push(fs.writeFile(path.join(dir, GRAPH_FILE), graphStr));
     }
 
     await Promise.all(promises);
   }
 
-  abstract graph(): Graph<any, any>;
+  visualize(): void {
+    // TODO
+  }
+
+  graph(useCache: boolean = true): Graph {
+    if (useCache && this.moduleGraph !== undefined) {
+      return this.moduleGraph;
+    }
+
+    this.moduleGraph = this.graphInternal();
+    return this.moduleGraph;
+  }
+
+  abstract graphInternal(): Graph;
 }
