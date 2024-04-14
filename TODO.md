@@ -2,7 +2,7 @@
 
 - [x] Chunk splitting
 - [x] output.iife on vs off in WP5
-- [ ] Hashed module IDs plugin
+- [x] Hashed module IDs plugin
 - [ ] Terser plugin
 - [ ] Different values of output.chunkFormat in WP5 (doesn't exist in WP4) - will likely need dev work
 
@@ -18,10 +18,9 @@
 
 - [x] Make some full examples - include their webpack versions and configs. Use pnpm workspaces.
 - [x] Add metadata file to load in previously unpacked bundles for further operation
+- [ ] Expose typedefs for index.ts - maybe api-extractor?
 - [ ] Use node:test (or vitest?) to test the examples
-- [ ] Write a readme with some example usage
 - [ ] Add pretty logging when parsing chunks with loading spinners
 - [ ] Add colors for logs?
 - [ ] Add support for library mode bundles (via output.library/output.libraryTarget + their various module formats)
-- [ ] Clean-up and expose a JS API with type defs - class-based API perhaps?
 - [ ] Support for other bundlers - rollup first (to capture Vite usages), then maybe parcel and esbuild
