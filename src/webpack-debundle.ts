@@ -10,8 +10,8 @@ import {
   isAnyFunctionExpression,
   getIifeCallExpression,
   maybeUnwrapTopLevelIife,
-  replaceAstNodes,
 } from "./utils";
+import { replace } from "./ast-mods";
 
 export interface WebpackModuleMap {
   moduleFns: Record<string, t.ArrowFunctionExpression | t.FunctionExpression>;
@@ -234,12 +234,9 @@ export class WebpackDebundle extends Debundle {
           ? t.arrayExpression([])
           : t.objectExpression([]);
 
-        replaceAstNodes(
-          chunk.ast,
-          // replace the module map in the additional chunk with an empty expression of the same type
-          // this ensures chunks are still loaded the same, but modules are not as they are split out
-          new Map([[moduleMapExpr, newModuleMapExpr]])
-        );
+        // replace the module map in the additional chunk with an empty expression of the same type
+        // this ensures chunks are still loaded the same, but modules are not as they are split out
+        this.addAstMods(chunk, replace(moduleMapExpr, newModuleMapExpr));
       }
     }
 
@@ -261,20 +258,16 @@ export class WebpackDebundle extends Debundle {
           )
         );
 
-    replaceAstNodes(
-      runtimeChunkInfo.chunk.ast,
-      new Map<t.Node, t.Node>([
-        // replace the module map member expression in the require function with require(...)
-        [
-          runtimeModuleMapMemberExpr,
-          t.callExpression(t.identifier("require"), [
-            runtimeModuleMapMemberExpr,
-          ]),
-        ],
-        // replace the actual module map expression with our mapping from module ID -> file name
-        [runtimeModuleMapExpr, newRuntimeModuleMapExpr],
-      ])
+    this.addAstMods(
+      runtimeChunkInfo.chunk,
+      replace(
+        runtimeModuleMapMemberExpr,
+        t.callExpression(t.identifier("require"), [runtimeModuleMapMemberExpr])
+      ),
+      replace(runtimeModuleMapExpr, newRuntimeModuleMapExpr)
     );
+
+    this.commitAstMods();
   }
 
   graphInternal(): Graph {

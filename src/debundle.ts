@@ -2,14 +2,17 @@ import path from "path";
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
 import fs from "fs/promises";
-import { Chunk, Module } from "./types";
+import { Chunk, Module, NamedAST } from "./types";
 import { GRAPH_FILE, MODULES_DIR, ensureDirectory, formatBytes } from "./utils";
 import Graph from "graphology";
 import gexf from "graphology-gexf";
+import traverse, { Visitor } from "@babel/traverse";
 
 export abstract class Debundle {
   protected chunks: Map<string, Chunk> = new Map();
   protected modules: Map<string, Module> = new Map();
+  protected pendingAstMods: Map<NamedAST, Visitor<unknown>[]> = new Map();
+
   protected moduleGraph: Graph | undefined = undefined;
   protected visualization: string | undefined = undefined;
 
@@ -51,11 +54,30 @@ export abstract class Debundle {
     console.log(` - Unique modules: ${this.modules.size}`);
   }
 
+  addAstMods(ast: NamedAST, ...mod: Visitor<unknown>[]): void {
+    if (!this.pendingAstMods.has(ast)) {
+      this.pendingAstMods.set(ast, []);
+    }
+
+    this.pendingAstMods.get(ast)!.push(...mod);
+  }
+
+  commitAstMods(): void {
+    for (const [ast, mods] of this.pendingAstMods.entries()) {
+      const visitors = traverse.visitors.merge(mods);
+      traverse(ast.ast, visitors);
+    }
+
+    this.pendingAstMods.clear();
+  }
+
   async save(dir: string, ext: string): Promise<void> {
     const moduleDir = path.resolve(dir, MODULES_DIR);
 
     const promises: Promise<void>[] = [];
     await ensureDirectory(moduleDir, false, true);
+
+    this.commitAstMods();
 
     for (const { ast, name } of this.chunks.values()) {
       const outputCode = generate(ast).code;

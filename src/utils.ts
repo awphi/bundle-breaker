@@ -98,24 +98,6 @@ export async function ensureDirectory(
   }
 }
 
-export function replaceAstNodes(
-  parent: t.Node,
-  replacements: Map<t.Node, t.Node>
-): void {
-  traverse(parent, {
-    enter(path) {
-      if (replacements.has(path.node)) {
-        const v = replacements.get(path.node);
-        replacements.delete(path.node);
-        path.replaceWith(v);
-        if (replacements.size === 0) {
-          path.stop();
-        }
-      }
-    },
-  });
-}
-
 export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
   // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
   if (program.body.length === 1) {

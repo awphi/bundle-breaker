@@ -53,7 +53,9 @@ out/
 
 ## Graph
 
-`bundle-breaker` can traverse the separates modules produced in the debundling step to look for imports/exports and build a module graph. This can be enabled like so:
+`bundle-breaker` can traverse the modules produced in the debundling step to build a module graph.
+
+JS API:
 
 ```javascript
 import { debundle } from "bundle-breaker";

@@ -1,3 +1,4 @@
+import { Visitor } from "@babel/traverse";
 import * as t from "@babel/types";
 
 export type AnyFunctionExpression =
