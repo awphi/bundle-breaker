@@ -1,4 +1,3 @@
-import { Visitor } from "@babel/traverse";
 import * as t from "@babel/types";
 
 export type AnyFunctionExpression =
@@ -20,4 +19,10 @@ export interface Chunk extends NamedAST {
 
 export interface Module extends NamedAST {
   src: Chunk;
+}
+
+export interface DeobfsucateOpts {
+  flipLiterals?: boolean;
+  voidLiteralToUndefined?: boolean;
+  verboseTrueFalse?: boolean;
 }

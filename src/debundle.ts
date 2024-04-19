@@ -2,11 +2,18 @@ import path from "path";
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
 import fs from "fs/promises";
-import { Chunk, Module, NamedAST } from "./types";
+import { Chunk, DeobfsucateOpts, Module, NamedAST } from "./types";
 import { GRAPH_FILE, MODULES_DIR, ensureDirectory, formatBytes } from "./utils";
 import Graph from "graphology";
 import gexf from "graphology-gexf";
 import traverse, { Visitor } from "@babel/traverse";
+import * as astMods from "./ast-mods";
+
+const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
+  flipLiterals: true,
+  voidLiteralToUndefined: true,
+  verboseTrueFalse: true,
+};
 
 export abstract class Debundle {
   protected chunks: Map<string, Chunk> = new Map();
@@ -14,7 +21,6 @@ export abstract class Debundle {
   protected pendingAstMods: Map<NamedAST, Visitor<unknown>[]> = new Map();
 
   protected moduleGraph: Graph | undefined = undefined;
-  protected visualization: string | undefined = undefined;
 
   constructor(chunks: Record<string, string>) {
     const textEncoder = new TextEncoder();
@@ -107,6 +113,24 @@ export abstract class Debundle {
 
     this.moduleGraph = this.graphInternal();
     return this.moduleGraph;
+  }
+
+  deobfuscate(optsBase?: DeobfsucateOpts): void {
+    const opts = Object.assign({}, DEFAULT_DEOB_OPTS, optsBase);
+    for (const key of Object.keys(opts)) {
+      const enabled = opts[key] ?? true;
+      if (key in astMods && enabled) {
+        const codemod = astMods[key]();
+
+        for (const chunk of this.chunks.values()) {
+          this.addAstMods(chunk, codemod);
+        }
+
+        for (const m of this.modules.values()) {
+          this.addAstMods(m, codemod);
+        }
+      }
+    }
   }
 
   abstract graphInternal(): Graph;

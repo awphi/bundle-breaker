@@ -18,6 +18,10 @@ program
   .option("-e, --entry <file>", "manually specify an entry file to the bundle")
   .option("-c, --clear", "clear the output directory before writing")
   .option("-g, --graph", "serialize the module graph in GEXF format")
+  .option(
+    "-d, --deobfuscate",
+    "apply code transformations on the output to reverse common obfuscation techniques"
+  )
   .option("-ext, --extension <ext>", "file extension to use for output", "js")
   .action(async (baseInDir: string, baseOutDir: string, options: any) => {
     const inDir = path.resolve(baseInDir);
@@ -49,6 +53,10 @@ program
 
     if (options.graph) {
       deb.graph();
+    }
+
+    if (options.deobfuscate) {
+      deb.deobfuscate();
     }
 
     deb.save(outDir, options.extension);
