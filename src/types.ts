@@ -25,4 +25,6 @@ export interface DeobfsucateOpts {
   flipLiterals?: boolean;
   voidLiteralToUndefined?: boolean;
   verboseTrueFalse?: boolean;
+  decimalNumericLiterals?: boolean;
+  breakSequenceExpressions?: boolean;
 }

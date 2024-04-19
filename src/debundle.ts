@@ -13,6 +13,8 @@ const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
   flipLiterals: true,
   voidLiteralToUndefined: true,
   verboseTrueFalse: true,
+  decimalNumericLiterals: true,
+  breakSequenceExpressions: true,
 };
 
 export abstract class Debundle {

@@ -96,3 +96,33 @@ export function verboseTrueFalse(): Visitor<t.UnaryExpression> {
     },
   };
 }
+
+export function decimalNumericLiterals(): Visitor<t.NumericLiteral> {
+  return {
+    NumericLiteral: function (path) {
+      const {
+        node: { extra, value },
+      } = path;
+      if (
+        typeof extra.raw === "string" &&
+        typeof extra.rawValue === "number" &&
+        extra.raw !== extra.rawValue.toString()
+      ) {
+        extra.raw = value.toString();
+      }
+    },
+  };
+}
+
+export function breakSequenceExpressions(): Visitor<t.SequenceExpression> {
+  return {
+    SequenceExpression: function (path) {
+      const {
+        node: { expressions },
+      } = path;
+      path.replaceWithMultiple(
+        expressions.map((expr) => t.expressionStatement(expr))
+      );
+    },
+  };
+}
