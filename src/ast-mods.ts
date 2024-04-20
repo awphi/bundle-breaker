@@ -54,9 +54,11 @@ export function flipLiterals(): Visitor<t.BinaryExpression> {
       const {
         node: { right, left, operator },
       } = path;
+
       if (
-        t.isLiteral(left) &&
-        !t.isLiteral(right) &&
+        !t.isIdentifier(left) &&
+        !t.isPrivateName(left) &&
+        t.isIdentifier(right) &&
         flippableOperations.has(operator)
       ) {
         path.node.left = right;
@@ -108,6 +110,7 @@ export function decimalNumericLiterals(): Visitor<t.NumericLiteral> {
         typeof extra.rawValue === "number" &&
         extra.raw !== extra.rawValue.toString()
       ) {
+        path.addComment("inner", extra.rawValue.toString());
         extra.raw = value.toString();
       }
     },
@@ -116,13 +119,13 @@ export function decimalNumericLiterals(): Visitor<t.NumericLiteral> {
 
 export function breakSequenceExpressions(): Visitor<t.SequenceExpression> {
   return {
-    SequenceExpression: function (path) {
-      const {
-        node: { expressions },
-      } = path;
-      path.replaceWithMultiple(
-        expressions.map((expr) => t.expressionStatement(expr))
-      );
+    ExpressionStatement: function (path) {
+      if (t.isSequenceExpression(path.node.expression)) {
+        const { expressions } = path.node.expression;
+        path.replaceWithMultiple(
+          expressions.map((expr) => t.expressionStatement(expr))
+        );
+      }
     },
   };
 }
