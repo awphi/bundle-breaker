@@ -29,6 +29,9 @@ importers:
       graphology-gexf:
         specifier: ^0.13.0
         version: 0.13.0(graphology-types@0.24.7)
+      hash-sum:
+        specifier: ^2.0.0
+        version: 2.0.0
       tslib:
         specifier: ^2.6.2
         version: 2.6.2
@@ -39,6 +42,9 @@ importers:
       '@types/babel__traverse':
         specifier: ^7.20.5
         version: 7.20.5
+      '@types/hash-sum':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@types/node':
         specifier: 20.11.0
         version: 20.11.0
@@ -366,6 +372,10 @@ packages:
     dependencies:
       '@types/minimatch': 5.1.2
       '@types/node': 20.11.0
+    dev: true
+
+  /@types/hash-sum@1.0.2:
+    resolution: {integrity: sha512-UP28RddqY8xcU0SCEp9YKutQICXpaAq9N8U2klqF5hegGha7KzTOL8EdhIIV3bOSGBzjEpN9bU/d+nNZBdJYVw==}
     dev: true
 
   /@types/json-schema@7.0.15:
@@ -2004,6 +2014,10 @@ packages:
       readable-stream: 3.6.2
       safe-buffer: 5.2.1
     dev: true
+
+  /hash-sum@2.0.0:
+    resolution: {integrity: sha512-WdZTbAByD+pHfl/g9QSsBIIwy8IT+EsPiKDs0KNX+zSHhdDLFKdZu0BQHljvO+0QI/BasbMSUa8wYNCZTvhslg==}
+    dev: false
 
   /hash.js@1.1.7:
     resolution: {integrity: sha512-taOaskGt4z4SOANNseOviYDvjEJinIkRgmp7LbKP2YTTmVxWBl87s/uzK9r+44BclBSp2X7K1hqeNfz9JbBeXA==}

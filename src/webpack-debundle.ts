@@ -1,9 +1,8 @@
-import { createHash } from "crypto";
 import * as t from "@babel/types";
 import traverse from "@babel/traverse";
 import { Debundle } from "./debundle";
 import { Chunk } from "./types";
-import Graph from "graphology";
+import { DirectedGraph } from "graphology";
 
 import {
   MODULES_DIR,
@@ -12,6 +11,7 @@ import {
   maybeUnwrapTopLevelIife,
 } from "./utils";
 import { replace } from "./ast-mods";
+import hash from "hash-sum";
 
 export interface WebpackModuleMap {
   moduleFns: Record<string, t.ArrowFunctionExpression | t.FunctionExpression>;
@@ -211,8 +211,6 @@ export class WebpackDebundle extends Debundle {
         }
 
         moduleFn.leadingComments = [];
-        const hash = createHash("shake256", { outputLength: 4 });
-        hash.update(moduleId);
         const ast = t.file(
           t.program([
             t.expressionStatement(
@@ -221,7 +219,7 @@ export class WebpackDebundle extends Debundle {
           ])
         );
         this.modules.set(moduleId, {
-          name: "bb_" + hash.digest("base64url"),
+          name: hash(ast),
           ast,
           src: chunk,
         });
@@ -268,9 +266,9 @@ export class WebpackDebundle extends Debundle {
     this.commitAstMods();
   }
 
-  graphInternal(): Graph {
+  graphInternal(): DirectedGraph {
     const { modules } = this;
-    const graph = new Graph({ allowSelfLoops: false });
+    const graph = new DirectedGraph({ allowSelfLoops: false });
     for (const { name } of this.modules.values()) {
       graph.addNode(name, { label: name });
     }
@@ -301,7 +299,9 @@ export class WebpackDebundle extends Debundle {
             (t.isStringLiteral(args[0]) || t.isNumericLiteral(args[0]))
           ) {
             const moduleId = modules.get(args[0].value.toString())!.name;
-            graph.addDirectedEdge(moduleId, name);
+            if (!graph.hasEdge(moduleId, name)) {
+              graph.addDirectedEdge(moduleId, name);
+            }
           }
         },
       });

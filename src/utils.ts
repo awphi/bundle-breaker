@@ -1,8 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
 import type { AnyFunctionExpression, IifeCallExpression } from "./types";
-
-import traverse from "@babel/traverse";
 import * as t from "@babel/types";
 
 export const MODULES_DIR = "./modules";

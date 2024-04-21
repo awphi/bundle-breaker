@@ -49,7 +49,6 @@ program
     );
 
     const deb = debundle(files, options.entry);
-    deb.debug();
 
     if (options.deobfuscate) {
       deb.deobfuscate();
@@ -59,6 +58,7 @@ program
       deb.graph();
     }
 
+    deb.debug();
     deb.save(outDir, options.extension);
   });
 

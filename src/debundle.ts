@@ -4,10 +4,11 @@ import generate from "@babel/generator";
 import fs from "fs/promises";
 import { Chunk, DeobfsucateOpts, Module, NamedAST } from "./types";
 import { GRAPH_FILE, MODULES_DIR, ensureDirectory, formatBytes } from "./utils";
-import Graph from "graphology";
+import { DirectedGraph } from "graphology";
 import gexf from "graphology-gexf";
 import traverse, { Visitor } from "@babel/traverse";
 import * as astMods from "./ast-mods";
+import hash from "hash-sum";
 
 const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
   flipLiterals: true,
@@ -23,8 +24,13 @@ export abstract class Debundle {
   protected chunks: Map<string, Chunk> = new Map();
   protected modules: Map<string, Module> = new Map();
   protected pendingAstMods: Map<NamedAST, Visitor<unknown>[]> = new Map();
+  protected id: string;
 
-  protected moduleGraph: Graph | undefined = undefined;
+  protected moduleGraph: DirectedGraph | undefined = undefined;
+
+  private computeId(): string {
+    return hash([...this.allModulesAllChunks()].map((a) => a.ast));
+  }
 
   constructor(chunks: Record<string, string>) {
     const textEncoder = new TextEncoder();
@@ -37,6 +43,7 @@ export abstract class Debundle {
         bytes: textEncoder.encode(code).byteLength,
       });
     }
+    this.id = this.computeId();
   }
 
   totalChunkSize(): number {
@@ -57,6 +64,7 @@ export abstract class Debundle {
 
   debug(): void {
     const chunkNames = [...this.chunks.keys()];
+    console.log(` - Debundle ID: ${this.id}`);
     console.log(` - Chunks (${chunkNames.length}): ${chunkNames.join(", ")}`);
     console.log(
       ` - Total chunk(s) size: ${formatBytes(this.totalChunkSize())}`
@@ -78,7 +86,10 @@ export abstract class Debundle {
       traverse(ast.ast, visitors);
     }
 
-    this.pendingAstMods.clear();
+    if (this.pendingAstMods.size > 0) {
+      this.id = this.computeId();
+      this.pendingAstMods.clear();
+    }
   }
 
   async save(dir: string, ext: string): Promise<void> {
@@ -110,7 +121,7 @@ export abstract class Debundle {
     await Promise.all(promises);
   }
 
-  graph(useCache: boolean = true): Graph {
+  graph(useCache: boolean = true): DirectedGraph {
     if (useCache && this.moduleGraph !== undefined) {
       return this.moduleGraph;
     }
@@ -141,5 +152,5 @@ export abstract class Debundle {
     // TODO do LLM-powered renaming as appropriate
   }
 
-  abstract graphInternal(): Graph;
+  abstract graphInternal(): DirectedGraph;
 }
