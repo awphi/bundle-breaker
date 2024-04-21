@@ -27,4 +27,6 @@ export interface DeobfsucateOpts {
   verboseTrueFalse?: boolean;
   decimalNumericLiterals?: boolean;
   breakSequenceExpressions?: boolean;
+  enforceBlockStatementsOnIfs?: boolean;
+  splitVariableDeclarators?: boolean;
 }

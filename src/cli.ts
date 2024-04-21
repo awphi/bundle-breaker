@@ -51,12 +51,12 @@ program
     const deb = debundle(files, options.entry);
     deb.debug();
 
-    if (options.graph) {
-      deb.graph();
-    }
-
     if (options.deobfuscate) {
       deb.deobfuscate();
+    }
+
+    if (options.graph) {
+      deb.graph();
     }
 
     deb.save(outDir, options.extension);

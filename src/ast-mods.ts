@@ -129,3 +129,33 @@ export function breakSequenceExpressions(): Visitor<t.SequenceExpression> {
     },
   };
 }
+
+export function enforceBlockStatementsOnIfs(): Visitor<t.IfStatement> {
+  return {
+    IfStatement: function (path) {
+      for (const key of ["alternate", "consequent"] as const) {
+        const subPath = path.get(key);
+        if (subPath.node !== null && !t.isBlockStatement(subPath.node)) {
+          subPath.replaceWith(t.blockStatement([subPath.node]));
+        }
+      }
+    },
+  };
+}
+
+export function splitVariableDeclarators(): Visitor<t.VariableDeclaration> {
+  return {
+    VariableDeclaration: function (path) {
+      const decs = path.node.declarations;
+      if (decs.length > 1) {
+        const parent = path.parentPath;
+        // it would be nice to pull irrelevant declarations out of the init section of for loops in the future
+        if (!t.isForStatement(parent.node)) {
+          path.replaceWithMultiple(
+            decs.map((d) => t.variableDeclaration(path.node.kind, [d]))
+          );
+        }
+      }
+    },
+  };
+}

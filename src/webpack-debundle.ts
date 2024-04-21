@@ -80,9 +80,7 @@ function findRuntimeChunk(
         chunk,
         requireFn,
       };
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (_) {}
   }
 
   throw new Error("Failed to auto-detect runtime chunk.");

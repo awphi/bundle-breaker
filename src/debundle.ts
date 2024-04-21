@@ -15,6 +15,8 @@ const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
   verboseTrueFalse: true,
   decimalNumericLiterals: true,
   breakSequenceExpressions: true,
+  enforceBlockStatementsOnIfs: true,
+  splitVariableDeclarators: true,
 };
 
 export abstract class Debundle {
@@ -117,6 +119,11 @@ export abstract class Debundle {
     return this.moduleGraph;
   }
 
+  *allModulesAllChunks() {
+    yield* this.modules.values();
+    yield* this.chunks.values();
+  }
+
   deobfuscate(optsBase?: DeobfsucateOpts): void {
     const opts = Object.assign({}, DEFAULT_DEOB_OPTS, optsBase);
     for (const key of Object.keys(opts)) {
@@ -124,15 +131,14 @@ export abstract class Debundle {
       if (key in astMods && enabled) {
         const codemod = astMods[key]();
 
-        for (const chunk of this.chunks.values()) {
+        for (const chunk of this.allModulesAllChunks()) {
           this.addAstMods(chunk, codemod);
-        }
-
-        for (const m of this.modules.values()) {
-          this.addAstMods(m, codemod);
         }
       }
     }
+
+    this.commitAstMods();
+    // TODO do LLM-powered renaming as appropriate
   }
 
   abstract graphInternal(): Graph;
