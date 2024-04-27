@@ -9,6 +9,7 @@ import {
   isAnyFunctionExpression,
   getIifeCallExpression,
   maybeUnwrapTopLevelIife,
+  MODULE_MAPPING_FILE,
 } from "./utils";
 import { replace } from "./ast-mods";
 import hash from "hash-sum";
@@ -32,6 +33,7 @@ const moduleExportsExpr = t.memberExpression(
   t.identifier("module"),
   t.identifier("exports")
 );
+const requireId = t.identifier("require");
 
 function makeModuleMap(expr?: t.Node): WebpackModuleMap {
   const result: WebpackModuleMap = {
@@ -191,15 +193,12 @@ export class WebpackDebundle extends Debundle {
       runtimeChunkInfo.chunk
     );
 
-    const allModuleMapExprs: (t.ArrayExpression | t.ObjectExpression)[] = [];
-
     for (const chunk of this.chunks.values()) {
       const { name } = chunk;
       const isRuntimeChunk = chunk === runtimeChunkInfo.chunk;
       const { moduleFns, moduleMapExpr } = isRuntimeChunk
         ? runtimeChunkModuleMap
         : findAdditionalChunkModuleMap(chunk);
-      allModuleMapExprs.push(moduleMapExpr);
 
       for (const [moduleId, moduleFn] of Object.entries(moduleFns)) {
         if (this.modules.has(moduleId)) {
@@ -244,24 +243,48 @@ export class WebpackDebundle extends Debundle {
       runtimeChunkInfo.requireFn;
     const { moduleMapExpr: runtimeModuleMapExpr } = runtimeChunkModuleMap;
 
-    const newRuntimeModuleMapExpr = allModuleMapExprs.every((v) =>
-      t.isArrayExpression(v)
-    )
-      ? t.arrayExpression(moduleEntries.map(([_, v]) => t.stringLiteral(v)))
-      : t.objectExpression(
-          moduleEntries.map(([k, v]) =>
-            t.objectProperty(t.stringLiteral(k), t.stringLiteral(v))
-          )
-        );
-
     this.addAstMods(
       runtimeChunkInfo.chunk,
       replace(
         runtimeModuleMapMemberExpr,
-        t.callExpression(t.identifier("require"), [runtimeModuleMapMemberExpr])
+        t.callExpression(requireId, [runtimeModuleMapMemberExpr])
       ),
-      replace(runtimeModuleMapExpr, newRuntimeModuleMapExpr)
+      replace(
+        runtimeModuleMapExpr,
+        t.callExpression(requireId, [
+          t.stringLiteral("./" + MODULE_MAPPING_FILE.slice(0, -3)),
+        ])
+      )
     );
+
+    const moduleMappingAst = t.file(
+      t.program([
+        t.expressionStatement(
+          t.assignmentExpression(
+            "=",
+            moduleExportsExpr,
+            // objects and arrays are indexed in the same way so just use an object for simplicity's sake
+            t.objectExpression(
+              moduleEntries.map(([k, v]) =>
+                t.objectProperty(t.stringLiteral(k), t.stringLiteral(v))
+              )
+            )
+          )
+        ),
+      ])
+    );
+
+    t.addComment(
+      moduleMappingAst,
+      "leading",
+      `\n  [BundleBreaker] - ${MODULE_MAPPING_FILE}\n  Maps internal webpack module IDs to computed meaningful IDs.\n  Original webpack module IDs are maintained for compatability with dynamic runtime imports.\n`
+    );
+
+    this.chunks.set(MODULE_MAPPING_FILE, {
+      ast: moduleMappingAst,
+      bytes: 0,
+      name: MODULE_MAPPING_FILE,
+    });
 
     this.commitAstMods();
   }
