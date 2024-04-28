@@ -157,5 +157,5 @@ export abstract class Debundle {
     // TODO do LLM-powered renaming as appropriate
   }
 
-  abstract graphInternal(): DirectedGraph;
+  protected abstract graphInternal(): DirectedGraph;
 }

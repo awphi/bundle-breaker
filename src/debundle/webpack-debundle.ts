@@ -1,7 +1,7 @@
 import * as t from "@babel/types";
-import traverse from "@babel/traverse";
+import traverse, { NodePath } from "@babel/traverse";
 import { Debundle } from "./debundle";
-import { Chunk } from "../types";
+import { Chunk, NamedAST } from "../types";
 import { DirectedGraph } from "graphology";
 
 import {
@@ -14,6 +14,10 @@ import {
 import { replace } from "../visitor/common";
 import hash from "hash-sum";
 
+export type WebpackRequireFnCall = t.CallExpression & {
+  arguments: [t.StringLiteral | t.NumericLiteral];
+};
+
 export interface WebpackModuleMap {
   moduleFns: Record<string, t.ArrowFunctionExpression | t.FunctionExpression>;
   moduleMapExpr: t.ObjectExpression | t.ArrayExpression | undefined;
@@ -22,10 +26,11 @@ export interface WebpackModuleMap {
 export interface WebpackRuntimeChunkInfo {
   chunk: Chunk;
   requireFn: WebpackRequireFnInfo;
+  moduleMap: WebpackModuleMap;
 }
 
 export interface WebpackRequireFnInfo {
-  functionDec: t.FunctionDeclaration;
+  functionDec: t.FunctionDeclaration & { id: t.Identifier };
   moduleMapMemberExpr: t.MemberExpression;
 }
 
@@ -78,9 +83,12 @@ function findRuntimeChunk(
     try {
       // attempt to make an object, simply try the next chunk if we get an error
       const requireFn = findWebpackRequireFn(chunk);
+      const moduleMap = findRuntimeChunkModuleMap(chunk);
+
       return {
         chunk,
         requireFn,
+        moduleMap,
       };
     } catch (_) {}
   }
@@ -121,12 +129,16 @@ function findWebpackRequireFn({ ast, name }: Chunk): WebpackRequireFnInfo {
     });
   }
 
-  if (functionDec === undefined || moduleMapMemberExpr === undefined) {
+  if (
+    functionDec === undefined ||
+    moduleMapMemberExpr === undefined ||
+    !functionDec.id
+  ) {
     throw new Error(`Unable to find webpack require function in '${name}'`);
   }
 
   return {
-    functionDec,
+    functionDec: functionDec as WebpackRequireFnInfo["functionDec"],
     moduleMapMemberExpr,
   };
 }
@@ -179,7 +191,30 @@ function findAdditionalChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
   throw new Error(`Failed to locate module map in chunk ${name}`);
 }
 
+function forEachWebpackRequireFnCall(
+  { name, ast }: NamedAST,
+  requireFnId: t.Identifier,
+  callback: (fileName: string, path: NodePath<WebpackRequireFnCall>) => void
+): void {
+  traverse(ast, {
+    CallExpression(path) {
+      const { callee, arguments: args } = path.node;
+      if (
+        t.isIdentifier(callee) &&
+        callee.name === requireFnId.name &&
+        path.scope.getBinding(callee.name).identifier === requireFnId &&
+        args.length === 1 &&
+        (t.isStringLiteral(args[0]) || t.isNumericLiteral(args[0]))
+      ) {
+        callback(name, path as NodePath<WebpackRequireFnCall>);
+      }
+    },
+  });
+}
+
 export class WebpackDebundle extends Debundle {
+  private runtimeChunkInfo: WebpackRuntimeChunkInfo;
+
   constructor(files: Record<string, string>, knownEntry?: string) {
     super(files);
 
@@ -189,15 +224,13 @@ export class WebpackDebundle extends Debundle {
         : this.chunks.values();
 
     const runtimeChunkInfo = findRuntimeChunk(potentialRuntimeChunks);
-    const runtimeChunkModuleMap = findRuntimeChunkModuleMap(
-      runtimeChunkInfo.chunk
-    );
+    this.runtimeChunkInfo = runtimeChunkInfo;
 
     for (const chunk of this.chunks.values()) {
       const { name } = chunk;
       const isRuntimeChunk = chunk === runtimeChunkInfo.chunk;
       const { moduleFns, moduleMapExpr } = isRuntimeChunk
-        ? runtimeChunkModuleMap
+        ? runtimeChunkInfo.moduleMap
         : findAdditionalChunkModuleMap(chunk);
 
       for (const [moduleId, moduleFn] of Object.entries(moduleFns)) {
@@ -241,7 +274,6 @@ export class WebpackDebundle extends Debundle {
     );
     const { moduleMapMemberExpr: runtimeModuleMapMemberExpr } =
       runtimeChunkInfo.requireFn;
-    const { moduleMapExpr: runtimeModuleMapExpr } = runtimeChunkModuleMap;
 
     this.addAstMods(
       runtimeChunkInfo.chunk,
@@ -250,7 +282,7 @@ export class WebpackDebundle extends Debundle {
         t.callExpression(requireId, [runtimeModuleMapMemberExpr])
       ),
       replace(
-        runtimeModuleMapExpr,
+        runtimeChunkInfo.moduleMap.moduleMapExpr,
         t.callExpression(requireId, [
           t.stringLiteral("./" + MODULE_MAPPING_FILE.slice(0, -3)),
         ])
@@ -289,15 +321,11 @@ export class WebpackDebundle extends Debundle {
     this.commitAstMods();
   }
 
-  graphInternal(): DirectedGraph {
-    const { modules } = this;
-    const graph = new DirectedGraph({ allowSelfLoops: false });
-    for (const { name } of this.modules.values()) {
-      graph.addNode(name, { label: name });
-    }
-
-    for (const { ast, name } of this.modules.values()) {
-      const expr = ast.program.body[0];
+  private forEachWebpackRequireFnCall(
+    callback: (fileName: string, path: NodePath<WebpackRequireFnCall>) => void
+  ): void {
+    for (const mod of this.modules.values()) {
+      const expr = mod.ast.program.body[0];
       if (
         !(
           t.isExpressionStatement(expr) &&
@@ -311,24 +339,37 @@ export class WebpackDebundle extends Debundle {
       }
 
       const requireFnId = expr.expression.right.params[2];
-      traverse(ast, {
-        CallExpression(path) {
-          const { callee, arguments: args } = path.node;
-          if (
-            t.isIdentifier(callee) &&
-            callee.name === requireFnId.name &&
-            path.scope.getBinding(callee.name).identifier === requireFnId &&
-            args.length === 1 &&
-            (t.isStringLiteral(args[0]) || t.isNumericLiteral(args[0]))
-          ) {
-            const moduleId = modules.get(args[0].value.toString())!.name;
-            if (!graph.hasEdge(moduleId, name)) {
-              graph.addDirectedEdge(moduleId, name);
-            }
-          }
-        },
-      });
+      forEachWebpackRequireFnCall(mod, requireFnId, callback);
     }
+
+    const requireFnId = this.runtimeChunkInfo.requireFn.functionDec.id;
+    forEachWebpackRequireFnCall(
+      this.runtimeChunkInfo.chunk,
+      requireFnId,
+      callback
+    );
+  }
+
+  protected graphInternal(): DirectedGraph {
+    const { modules } = this;
+    const graph = new DirectedGraph({ allowSelfLoops: false });
+    const runtimeChunk = this.runtimeChunkInfo.chunk;
+    for (const { name } of this.modules.values()) {
+      graph.addNode(name, { label: name, file_type: "module" });
+    }
+    graph.addNode(runtimeChunk.name, {
+      label: runtimeChunk.name,
+      file_type: "entry",
+    });
+
+    this.forEachWebpackRequireFnCall((name, path) => {
+      console.log(name, path.node);
+      const arg = path.node.arguments[0];
+      const moduleId = modules.get(arg.value.toString())!.name;
+      if (!graph.hasEdge(moduleId, name)) {
+        graph.addDirectedEdge(moduleId, name);
+      }
+    });
 
     return graph;
   }
