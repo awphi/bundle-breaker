@@ -2,12 +2,17 @@ import path from "path";
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
 import fs from "fs/promises";
-import { Chunk, DeobfsucateOpts, Module, NamedAST } from "./types";
-import { GRAPH_FILE, MODULES_DIR, ensureDirectory, formatBytes } from "./utils";
+import { Chunk, DeobfsucateOpts, Module, NamedAST } from "../types";
+import {
+  GRAPH_FILE,
+  MODULES_DIR,
+  ensureDirectory,
+  formatBytes,
+} from "../utils";
 import { DirectedGraph } from "graphology";
 import gexf from "graphology-gexf";
 import traverse, { Visitor } from "@babel/traverse";
-import * as astMods from "./ast-mods";
+import * as deobfuscate from "../visitor/deobfuscate";
 import hash from "hash-sum";
 
 const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
@@ -139,8 +144,8 @@ export abstract class Debundle {
     const opts = Object.assign({}, DEFAULT_DEOB_OPTS, optsBase);
     for (const key of Object.keys(opts)) {
       const enabled = opts[key] ?? true;
-      if (key in astMods && enabled) {
-        const codemod = astMods[key]();
+      if (key in deobfuscate && enabled) {
+        const codemod = deobfuscate[key]();
 
         for (const chunk of this.allModulesAllChunks()) {
           this.addAstMods(chunk, codemod);

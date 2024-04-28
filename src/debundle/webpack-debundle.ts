@@ -1,7 +1,7 @@
 import * as t from "@babel/types";
 import traverse from "@babel/traverse";
 import { Debundle } from "./debundle";
-import { Chunk } from "./types";
+import { Chunk } from "../types";
 import { DirectedGraph } from "graphology";
 
 import {
@@ -10,8 +10,8 @@ import {
   getIifeCallExpression,
   maybeUnwrapTopLevelIife,
   MODULE_MAPPING_FILE,
-} from "./utils";
-import { replace } from "./ast-mods";
+} from "../utils";
+import { replace } from "../visitor/common";
 import hash from "hash-sum";
 
 export interface WebpackModuleMap {
