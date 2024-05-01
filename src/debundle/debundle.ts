@@ -33,10 +33,6 @@ export abstract class Debundle {
 
   protected moduleGraph: DirectedGraph | undefined = undefined;
 
-  private computeId(): string {
-    return hash([...this.allModulesAllChunks()].map((a) => a.ast));
-  }
-
   constructor(chunks: Record<string, string>) {
     const textEncoder = new TextEncoder();
     for (const name of Object.keys(chunks)) {
@@ -48,7 +44,11 @@ export abstract class Debundle {
         bytes: textEncoder.encode(code).byteLength,
       });
     }
-    this.id = this.computeId();
+    this.updateId();
+  }
+
+  private updateId(): void {
+    this.id = hash([...this.allModulesAllChunks()].map((a) => a.ast));
   }
 
   totalChunkSize(): number {
@@ -86,13 +86,13 @@ export abstract class Debundle {
   }
 
   commitAstMods(): void {
-    for (const [ast, mods] of this.pendingAstMods.entries()) {
-      const visitors = traverse.visitors.merge(mods);
-      traverse(ast.ast, visitors);
-    }
-
     if (this.pendingAstMods.size > 0) {
-      this.id = this.computeId();
+      for (const [ast, mods] of this.pendingAstMods.entries()) {
+        const visitors = traverse.visitors.merge(mods);
+        traverse(ast.ast, visitors);
+      }
+
+      this.updateId();
       this.pendingAstMods.clear();
     }
   }

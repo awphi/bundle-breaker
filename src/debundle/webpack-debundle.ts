@@ -306,12 +306,6 @@ export class WebpackDebundle extends Debundle {
       ])
     );
 
-    t.addComment(
-      moduleMappingAst,
-      "leading",
-      `\n  [BundleBreaker] - ${MODULE_MAPPING_FILE}\n  Maps internal webpack module IDs to computed meaningful IDs.\n  Original webpack module IDs are maintained for compatability with dynamic runtime imports.\n`
-    );
-
     this.chunks.set(MODULE_MAPPING_FILE, {
       ast: moduleMappingAst,
       bytes: 0,
@@ -372,5 +366,17 @@ export class WebpackDebundle extends Debundle {
     });
 
     return graph;
+  }
+
+  addComments(): void {
+    for (const [moduleId, { ast }] of this.modules.entries()) {
+      t.addComment(ast, "leading", ` Webpack module ID: '${moduleId}' `);
+    }
+
+    this.forEachWebpackRequireFnCall((_, path) => {
+      const arg = path.get("arguments")[0];
+      const { name } = this.getModule(arg.node.value.toString());
+      arg.addComment("inner", `${MODULES_DIR}/${name}`);
+    });
   }
 }

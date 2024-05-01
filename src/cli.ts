@@ -3,7 +3,7 @@ import { program } from "commander";
 import path from "path";
 import fs from "fs/promises";
 import { ensureDirectory } from "./utils";
-import { debundle } from ".";
+import { WebpackDebundle, debundle } from ".";
 
 const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 // use require() to prevent tsc copying package.json into the dist/ folder when building
@@ -52,6 +52,9 @@ program
 
     if (options.deobfuscate) {
       deb.deobfuscate();
+      if (deb instanceof WebpackDebundle) {
+        deb.addComments();
+      }
     }
 
     if (options.graph) {

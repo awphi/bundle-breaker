@@ -91,7 +91,7 @@ export function decimalNumericLiterals(): Visitor<t.NumericLiteral> {
         typeof extra.rawValue === "number" &&
         extra.raw !== extra.rawValue.toString()
       ) {
-        path.addComment("inner", extra.rawValue.toString());
+        path.addComment("inner", extra.raw.toString());
         extra.raw = value.toString();
       }
     },
