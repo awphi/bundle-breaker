@@ -26,8 +26,8 @@ const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
 };
 
 export abstract class Debundle {
-  protected chunks: Map<string, Chunk> = new Map();
-  protected modules: Map<string, Module> = new Map();
+  protected chunks: Map<string, Readonly<Chunk>> = new Map();
+  protected modules: Map<string, Readonly<Module>> = new Map();
   protected pendingAstMods: Map<NamedAST, Visitor<unknown>[]> = new Map();
   protected id: string;
 

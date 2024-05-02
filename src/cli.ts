@@ -53,7 +53,7 @@ program
     if (options.deobfuscate) {
       deb.deobfuscate();
       if (deb instanceof WebpackDebundle) {
-        deb.addComments();
+        deb.rewriteImports();
       }
     }
 

@@ -275,11 +275,24 @@ export class WebpackDebundle extends Debundle {
     const { moduleMapMemberExpr: runtimeModuleMapMemberExpr } =
       runtimeChunkInfo.requireFn;
 
+    // look in module_mapping first to deal with computed IDs and unprocessed require calls
+    // if not found then we've probably modified it so we can assume it's a module file on disk
+    // this boils down to something like `require(__webpack_modules__[moduleId] || "./modules/" + moduleId)(...)`
+    const moduleMapMemberExprWithFallback = t.logicalExpression(
+      "||",
+      runtimeModuleMapMemberExpr,
+      t.binaryExpression(
+        "+",
+        t.stringLiteral(MODULES_DIR + "/"),
+        runtimeModuleMapMemberExpr.property as t.Expression
+      )
+    );
+
     this.addAstMods(
       runtimeChunkInfo.chunk,
       replace(
         runtimeModuleMapMemberExpr,
-        t.callExpression(requireId, [runtimeModuleMapMemberExpr])
+        t.callExpression(requireId, [moduleMapMemberExprWithFallback])
       ),
       replace(
         runtimeChunkInfo.moduleMap.moduleMapExpr,
@@ -311,6 +324,10 @@ export class WebpackDebundle extends Debundle {
       bytes: 0,
       name: MODULE_MAPPING_FILE,
     });
+
+    for (const [moduleId, { ast }] of this.modules.entries()) {
+      t.addComment(ast, "leading", ` Webpack module ID: '${moduleId}' `);
+    }
 
     this.commitAstMods();
   }
@@ -357,9 +374,10 @@ export class WebpackDebundle extends Debundle {
     });
 
     this.forEachWebpackRequireFnCall((name, path) => {
-      console.log(name, path.node);
-      const arg = path.node.arguments[0];
-      const moduleId = modules.get(arg.value.toString())!.name;
+      const id = path.node.arguments[0].value.toString();
+      // check in the module cache first (which effectively stores module_mapping in memory) for the name
+      // if not found then assume we're dealing with the name already (TODO might make sense to validate this assumption)
+      const moduleId = modules.get(id)?.name ?? id;
       if (!graph.hasEdge(moduleId, name)) {
         graph.addDirectedEdge(moduleId, name);
       }
@@ -368,15 +386,14 @@ export class WebpackDebundle extends Debundle {
     return graph;
   }
 
-  addComments(): void {
-    for (const [moduleId, { ast }] of this.modules.entries()) {
-      t.addComment(ast, "leading", ` Webpack module ID: '${moduleId}' `);
-    }
-
+  rewriteImports(): void {
     this.forEachWebpackRequireFnCall((_, path) => {
       const arg = path.get("arguments")[0];
       const { name } = this.getModule(arg.node.value.toString());
-      arg.addComment("inner", `${MODULES_DIR}/${name}`);
+      // replace with name and nothing else to avoid breaking module graph construction
+      const literal = t.stringLiteral(name);
+      t.addComment(literal, "inner", arg.node.value.toString());
+      arg.replaceWith(literal);
     });
   }
 }

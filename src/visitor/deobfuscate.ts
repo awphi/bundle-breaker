@@ -22,7 +22,6 @@ const flippableOperations = new Set<BinaryOperator>(
     "===",
     "==",
     "*",
-    "+",
     "&",
     "|",
     "^",
