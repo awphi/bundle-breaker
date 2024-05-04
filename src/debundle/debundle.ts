@@ -103,11 +103,12 @@ export abstract class Debundle {
 
   protected formatFileName(name: string): string {
     const extLength = path.extname(name).length;
-    return `${name.slice(0, -extLength)}.${this.outputExtension}`;
+    const basename = extLength > 0 ? name.slice(0, -extLength) : name;
+    return `${basename}.${this.outputExtension}`;
   }
 
-  async save(dir: string): Promise<void> {
-    const moduleDir = path.resolve(dir, MODULES_DIR);
+  async save(outDir: string): Promise<void> {
+    const moduleDir = path.resolve(outDir, MODULES_DIR);
 
     const promises: Promise<void>[] = [];
     await ensureDirectory(moduleDir, false, true);
@@ -118,14 +119,14 @@ export abstract class Debundle {
       const { ast, name, type } = item;
       const outputCode = generate(ast).code;
       const outFile = this.formatFileName(name);
-      const dir = type === "chunk" ? outFile : moduleDir;
+      const dir = type === "chunk" ? outDir : moduleDir;
       promises.push(fs.writeFile(path.join(dir, outFile), outputCode));
     }
 
     const { moduleGraph: graph } = this;
     if (graph !== undefined) {
       const graphStr = gexf.write(graph);
-      promises.push(fs.writeFile(path.join(dir, GRAPH_FILE), graphStr));
+      promises.push(fs.writeFile(path.join(outDir, GRAPH_FILE), graphStr));
     }
 
     await Promise.all(promises);
