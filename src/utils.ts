@@ -5,7 +5,6 @@ import * as t from "@babel/types";
 
 export const MODULES_DIR = "./modules";
 export const GRAPH_FILE = "graph.gexf";
-export const MODULE_MAPPING_FILE = "module_mapping.js";
 
 export function isAnyFunctionExpression(
   node: t.Node

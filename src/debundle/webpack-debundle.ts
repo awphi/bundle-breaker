@@ -9,7 +9,6 @@ import {
   isAnyFunctionExpression,
   getIifeCallExpression,
   maybeUnwrapTopLevelIife,
-  MODULE_MAPPING_FILE,
 } from "../utils";
 import { replace } from "../visitor/common";
 import hash from "hash-sum";
@@ -215,8 +214,12 @@ function forEachWebpackRequireFnCall(
 export class WebpackDebundle extends Debundle {
   private runtimeChunkInfo: WebpackRuntimeChunkInfo;
 
-  constructor(files: Record<string, string>, knownEntry?: string) {
-    super(files);
+  constructor(
+    files: Record<string, string>,
+    outputExtension: string,
+    knownEntry?: string
+  ) {
+    super(files, outputExtension);
 
     const potentialRuntimeChunks =
       knownEntry && this.chunks.has(knownEntry)
@@ -251,9 +254,10 @@ export class WebpackDebundle extends Debundle {
           ])
         );
         this.modules.set(moduleId, {
-          name: hash(ast),
+          name: this.formatFileName(hash(ast)),
           ast,
           src: chunk,
+          type: "module",
         });
       }
 
@@ -268,10 +272,6 @@ export class WebpackDebundle extends Debundle {
       }
     }
 
-    // now that all the modules have been collected we can codemod the module map expression in the runtime chunk
-    const moduleEntries: [string, string][] = [...this.modules.entries()].map(
-      ([k, m]) => [k, `${MODULES_DIR}/${m.name}`]
-    );
     const { moduleMapMemberExpr: runtimeModuleMapMemberExpr } =
       runtimeChunkInfo.requireFn;
 
@@ -288,6 +288,8 @@ export class WebpackDebundle extends Debundle {
       )
     );
 
+    const moduleMappingFileName = this.formatFileName("module_mapping");
+
     this.addAstMods(
       runtimeChunkInfo.chunk,
       replace(
@@ -297,32 +299,34 @@ export class WebpackDebundle extends Debundle {
       replace(
         runtimeChunkInfo.moduleMap.moduleMapExpr,
         t.callExpression(requireId, [
-          t.stringLiteral("./" + MODULE_MAPPING_FILE.slice(0, -3)),
+          t.stringLiteral(`./${moduleMappingFileName}`),
         ])
+      )
+    );
+
+    // objects and arrays are indexed in the same way so just use an object for simplicity's sake
+    const moduleMapObjectExpr = t.objectExpression(
+      [...this.modules.entries()].map(([k, m]) =>
+        t.objectProperty(
+          t.stringLiteral(k),
+          t.stringLiteral(`${MODULES_DIR}/${m.name}`)
+        )
       )
     );
 
     const moduleMappingAst = t.file(
       t.program([
         t.expressionStatement(
-          t.assignmentExpression(
-            "=",
-            moduleExportsExpr,
-            // objects and arrays are indexed in the same way so just use an object for simplicity's sake
-            t.objectExpression(
-              moduleEntries.map(([k, v]) =>
-                t.objectProperty(t.stringLiteral(k), t.stringLiteral(v))
-              )
-            )
-          )
+          t.assignmentExpression("=", moduleExportsExpr, moduleMapObjectExpr)
         ),
       ])
     );
 
-    this.chunks.set(MODULE_MAPPING_FILE, {
+    this.chunks.set(moduleMappingFileName, {
       ast: moduleMappingAst,
       bytes: 0,
-      name: MODULE_MAPPING_FILE,
+      name: moduleMappingFileName,
+      type: "chunk",
     });
 
     for (const [moduleId, { ast }] of this.modules.entries()) {

@@ -48,7 +48,7 @@ program
       })
     );
 
-    const deb = debundle(files, options.entry);
+    const deb = debundle(files, options.extension, options.entry);
 
     if (options.deobfuscate) {
       deb.deobfuscate();
@@ -62,7 +62,7 @@ program
     }
 
     deb.debug();
-    deb.save(outDir, options.extension);
+    deb.save(outDir);
   });
 
 program.parse();

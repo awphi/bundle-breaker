@@ -33,7 +33,10 @@ export abstract class Debundle {
 
   protected moduleGraph: DirectedGraph | undefined = undefined;
 
-  constructor(chunks: Record<string, string>) {
+  constructor(
+    chunks: Record<string, string>,
+    readonly outputExtension: string
+  ) {
     const textEncoder = new TextEncoder();
     for (const name of Object.keys(chunks)) {
       const code = chunks[name];
@@ -41,6 +44,7 @@ export abstract class Debundle {
       this.chunks.set(name, {
         ast,
         name,
+        type: "chunk",
         bytes: textEncoder.encode(code).byteLength,
       });
     }
@@ -97,7 +101,12 @@ export abstract class Debundle {
     }
   }
 
-  async save(dir: string, ext: string): Promise<void> {
+  protected formatFileName(name: string): string {
+    const extLength = path.extname(name).length;
+    return `${name.slice(0, -extLength)}.${this.outputExtension}`;
+  }
+
+  async save(dir: string): Promise<void> {
     const moduleDir = path.resolve(dir, MODULES_DIR);
 
     const promises: Promise<void>[] = [];
@@ -105,16 +114,12 @@ export abstract class Debundle {
 
     this.commitAstMods();
 
-    for (const { ast, name } of this.chunks.values()) {
+    for (const item of this.allModulesAllChunks()) {
+      const { ast, name, type } = item;
       const outputCode = generate(ast).code;
-      const outFile = `${name.slice(0, -path.extname(name).length)}.${ext}`;
+      const outFile = this.formatFileName(name);
+      const dir = type === "chunk" ? outFile : moduleDir;
       promises.push(fs.writeFile(path.join(dir, outFile), outputCode));
-    }
-
-    for (const { ast, name } of this.modules.values()) {
-      const outputCode = generate(ast).code;
-      const outFile = `${name}.${ext}`;
-      promises.push(fs.writeFile(path.join(moduleDir, outFile), outputCode));
     }
 
     const { moduleGraph: graph } = this;

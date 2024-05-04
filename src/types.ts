@@ -15,10 +15,12 @@ export interface NamedAST {
 
 export interface Chunk extends NamedAST {
   bytes: number;
+  type: "chunk";
 }
 
 export interface Module extends NamedAST {
   src: Chunk;
+  type: "module";
 }
 
 export interface DeobfsucateOpts {
