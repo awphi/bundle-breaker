@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@types/babel__traverse@7.20.5':
+    hash: 7pzg76pzqeb5j6zb4u3dv3ejru
+    path: patches/@types__babel__traverse@7.20.5.patch
+
 importers:
 
   .:
@@ -41,7 +46,7 @@ importers:
         version: 7.6.8
       '@types/babel__traverse':
         specifier: ^7.20.5
-        version: 7.20.5
+        version: 7.20.5(patch_hash=7pzg76pzqeb5j6zb4u3dv3ejru)
       '@types/hash-sum':
         specifier: ^1.0.2
         version: 1.0.2
@@ -49,8 +54,8 @@ importers:
         specifier: 20.11.0
         version: 20.11.0
       typescript:
-        specifier: ^5.4.2
-        version: 5.4.2
+        specifier: ^5.4.5
+        version: 5.4.5
 
   examples/webpack4:
     devDependencies:
@@ -343,11 +348,12 @@ packages:
       '@babel/types': 7.24.0
     dev: true
 
-  /@types/babel__traverse@7.20.5:
+  /@types/babel__traverse@7.20.5(patch_hash=7pzg76pzqeb5j6zb4u3dv3ejru):
     resolution: {integrity: sha512-WXCyOcRtH37HAUkpXhUduaxdm82b4GSlyTqajXviN4EfiuPgNYR109xMCKvpl6zPIpua0DGlMEDCq+g8EdoheQ==}
     dependencies:
       '@babel/types': 7.24.0
     dev: true
+    patched: true
 
   /@types/eslint-scope@3.7.7:
     resolution: {integrity: sha512-MzMFlSLBqNF2gcHWO0G1vP/YQyfvrxZ0bF+u7mzUdZ1/xK4A4sru+nraZz5i3iEIk1l1uyicaDVTB4QbbEkAYg==}
@@ -3634,8 +3640,8 @@ packages:
     resolution: {integrity: sha512-/aCDEGatGvZ2BIk+HmLf4ifCJFwvKFNb9/JeZPMulfgFracn9QFcAf5GO8B/mweUjSoblS5In0cWhqpfs/5PQA==}
     dev: true
 
-  /typescript@5.4.2:
-    resolution: {integrity: sha512-+2/g0Fds1ERlP6JsakQQDXjZdZMM+rqpamFZJEKh4kwTIn3iDkgKtby0CeNd5ATNZ4Ry1ax15TMx0W2V+miizQ==}
+  /typescript@5.4.5:
+    resolution: {integrity: sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==}
     engines: {node: '>=14.17'}
     hasBin: true
     dev: true

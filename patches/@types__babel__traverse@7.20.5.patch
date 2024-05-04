@@ -1,0 +1,14 @@
+diff --git a/index.d.ts b/index.d.ts
+index fdac4e4ec02001c4ddadfe2099c7b0f23c0946bf..8053ba17062e5f94c346317933c16acdecc55425 100644
+--- a/index.d.ts
++++ b/index.d.ts
+@@ -299,7 +299,8 @@ export class Binding {
+ export type Visitor<S = unknown> =
+     & VisitNodeObject<S, Node>
+     & {
+-        [Type in Node["type"]]?: VisitNode<S, Extract<Node, { type: Type }>>;
++        // this is dramatically more performant than Extract<Node, { type: Type }> in some circumstances (like this codebase)
++        [N in Node as N["type"]]?: VisitNode<S, N extends { type: N["type"] } ? N : never>;
+     }
+     & {
+         [K in keyof t.Aliases]?: VisitNode<S, t.Aliases[K]>;

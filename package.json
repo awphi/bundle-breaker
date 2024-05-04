@@ -40,6 +40,11 @@
     "@types/babel__traverse": "^7.20.5",
     "@types/hash-sum": "^1.0.2",
     "@types/node": "20.11.0",
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.5"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@types/babel__traverse@7.20.5": "patches/@types__babel__traverse@7.20.5.patch"
+    }
   }
 }
