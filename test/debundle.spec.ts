@@ -10,7 +10,6 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
     const files = readBundle(dir);
     let deb: Debundle;
     beforeEach(() => {
-      console.log("debundling");
       deb = debundle(files, "js");
     });
 
