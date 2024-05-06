@@ -150,15 +150,17 @@ function findRuntimeChunkModuleMap({ ast, name }: Chunk): WebpackModuleMap {
   } else {
     // webpack 5 - there exists a __webpack_modules__ variable in the body
     const body = maybeUnwrapTopLevelIife(ast.program);
-    const variableDecs = body.filter((v) =>
-      t.isVariableDeclaration(v)
+    const variableDecs = body.filter(
+      (v) => t.isVariableDeclaration(v) && v.declarations.length >= 1
     ) as t.VariableDeclaration[];
 
-    // assumes the __webpack_modules__ declaration always comes first
-    if (variableDecs.length >= 1 && variableDecs[0].declarations.length >= 1) {
-      const dec = variableDecs[0].declarations[0];
-      if (t.isVariableDeclarator(dec) && t.isObjectExpression(dec.init)) {
-        return makeModuleMap(dec.init);
+    // we expect the module map expression to be in the first non-empty variable declaration
+    // within that declaration we will look for the first object definition declarator
+    if (variableDecs.length >= 1) {
+      for (const declarator of variableDecs[0].declarations) {
+        if (t.isObjectExpression(declarator.init)) {
+          return makeModuleMap(declarator.init);
+        }
       }
     }
   }

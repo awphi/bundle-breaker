@@ -14,7 +14,7 @@ module.exports = {
     clean: true,
   },
   plugins: [
-    //new TerserPlugin(),
+    new TerserPlugin(),
     new HtmlWebpackPlugin({ favicon: path.resolve(__dirname, "favicon.ico") }),
   ],
   resolve: {
