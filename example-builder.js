@@ -77,12 +77,12 @@ program
   .command("build-all")
   .description("Build all examples")
   .action(async () => {
-    const exampleDirs = ["webpack4", "webpack5"].map(resolveExample);
+    const exampleDirs = ["webpack4", "webpack5"];
     const promises = [];
     const fail = [];
     const success = [];
 
-    for (const dir of exampleDirs) {
+    for (const dir of exampleDirs.map(resolveExample)) {
       for (const name of fs.readdirSync(dir)) {
         const ex = resolveExample(path.join(dir, name));
         if (name !== "node_modules" && fs.lstatSync(ex).isDirectory()) {

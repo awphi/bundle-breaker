@@ -11,8 +11,6 @@
 
 # Enhancements
 
-- [ ] Expose typedefs for index.ts - maybe api-extractor?
-- [ ] Use node:test (or vitest?) to test the examples
 - [ ] Add pretty logging when parsing chunks with loading spinners
 - [ ] Add colors for logs?
 - [ ] Add support for library mode bundles (via output.library/output.libraryTarget + their various module formats)

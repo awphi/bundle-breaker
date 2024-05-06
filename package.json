@@ -4,6 +4,7 @@
   "description": "Utilities to reverse-engineer bundled/obfuscated JS applications.",
   "main": "dist/index.js",
   "bin": "dist/cli.js",
+  "types": "dist/index.d.ts",
   "packageManager": "pnpm@8.15.4",
   "files": [
     "dist/"
@@ -19,6 +20,7 @@
     "dev": "pnpm build --watch",
     "prepack": "pnpm build",
     "build": "tsc",
+    "test": "vitest",
     "examples:build-all": "node example-builder.js build-all",
     "examples:build": "node example-builder.js build"
   },
@@ -40,7 +42,8 @@
     "@types/babel__traverse": "^7.20.5",
     "@types/hash-sum": "^1.0.2",
     "@types/node": "20.11.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
   },
   "pnpm": {
     "patchedDependencies": {

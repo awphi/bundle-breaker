@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "bundle-breaker": [".."]
+    },
+    "noEmit": true,
+    "moduleResolution": "Bundler",
+    "module": "Preserve"
+  },
+  "include": ["./**/*.ts"],
+  "exclude": []
+}

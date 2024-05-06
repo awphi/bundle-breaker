@@ -43,7 +43,7 @@ export abstract class Debundle {
       const ast = parser.parse(code);
       this.chunks.set(name, {
         ast,
-        name,
+        name: this.formatFileName(name),
         type: "chunk",
         bytes: textEncoder.encode(code).byteLength,
       });
@@ -53,6 +53,10 @@ export abstract class Debundle {
 
   private updateId(): void {
     this.id = hash([...this.allModulesAllChunks()].map((a) => a.ast));
+  }
+
+  getId(): string {
+    return this.id;
   }
 
   totalChunkSize(): number {
@@ -141,9 +145,17 @@ export abstract class Debundle {
     return this.moduleGraph;
   }
 
-  *allModulesAllChunks() {
+  *allModules() {
     yield* this.modules.values();
+  }
+
+  *allChunks() {
     yield* this.chunks.values();
+  }
+
+  *allModulesAllChunks() {
+    yield* this.allModules();
+    yield* this.allChunks();
   }
 
   deobfuscate(optsBase?: DeobfsucateOpts): void {

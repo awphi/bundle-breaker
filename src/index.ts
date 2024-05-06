@@ -10,4 +10,4 @@ export function debundle(
   return new WebpackDebundle(files, extension, knownEntry);
 }
 
-export { WebpackDebundle };
+export { WebpackDebundle, Debundle };

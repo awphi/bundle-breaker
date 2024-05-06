@@ -6,7 +6,8 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "importHelpers": true
+    "importHelpers": true,
+    "declaration": true
   },
   "include": ["src/**/*"],
   "exclude": []
