@@ -14,6 +14,7 @@ import gexf from "graphology-gexf";
 import traverse, { Visitor } from "@babel/traverse";
 import * as deobfuscate from "../visitor/deobfuscate";
 import hash from "hash-sum";
+import * as t from "@babel/types";
 
 const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
   flipLiterals: true,
@@ -26,27 +27,16 @@ const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
 };
 
 export abstract class Debundle {
-  protected chunks: Map<string, Readonly<Chunk>> = new Map();
-  protected modules: Map<string, Readonly<Module>> = new Map();
+  private chunks: Map<string, Readonly<Chunk>> = new Map();
+  private modules: Map<string, Readonly<Module>> = new Map();
   protected pendingAstMods: Map<NamedAST, Visitor<unknown>[]> = new Map();
   protected id: string;
 
   protected moduleGraph: DirectedGraph | undefined = undefined;
 
-  constructor(
-    chunks: Record<string, string>,
-    readonly outputExtension: string
-  ) {
-    const textEncoder = new TextEncoder();
+  constructor(chunks: Record<string, string>, readonly ext: string) {
     for (const name of Object.keys(chunks)) {
-      const code = chunks[name];
-      const ast = parser.parse(code);
-      this.chunks.set(name, {
-        ast,
-        name: this.formatFileName(name),
-        type: "chunk",
-        bytes: textEncoder.encode(code).byteLength,
-      });
+      this.addChunk(name, chunks[name]);
     }
     this.updateId();
   }
@@ -67,11 +57,11 @@ export abstract class Debundle {
     return c;
   }
 
-  getChunk(id: string): Chunk | undefined {
+  getChunk(id: string): Readonly<Chunk> | undefined {
     return this.chunks.get(id);
   }
 
-  getModule(id: string): Module | undefined {
+  getModule(id: string): Readonly<Module> | undefined {
     return this.modules.get(id);
   }
 
@@ -105,10 +95,52 @@ export abstract class Debundle {
     }
   }
 
-  protected formatFileName(name: string): string {
+  addChunk(id: string, content: string | t.File): Readonly<Chunk> {
+    const textEncoder = new TextEncoder();
+    const code = typeof content === "string" ? content : "";
+    const ast = typeof content === "string" ? parser.parse(code) : content;
+    const name = this.formatModuleOrChunkName(id);
+
+    const chunk: Readonly<Chunk> = {
+      type: "chunk",
+      bytes: textEncoder.encode(code).byteLength,
+      ast,
+      name,
+    };
+
+    // chunks are indexed by their formatted name as it doesn't change
+    this.chunks.set(name, chunk);
+    return chunk;
+  }
+
+  addModule(
+    id: string,
+    baseName: string,
+    src: Chunk,
+    ast: t.File
+  ): Readonly<Module> {
+    const name = path.posix.join(
+      MODULES_DIR,
+      this.formatModuleOrChunkName(baseName)
+    );
+    const mod: Readonly<Module> = {
+      type: "module",
+      ast,
+      name,
+      src,
+      originalId: id,
+    };
+
+    // the module cache is indexed by the original ID from the source bundle rather than our custom name
+    this.modules.set(id, mod);
+
+    return mod;
+  }
+
+  private formatModuleOrChunkName(name: string): string {
     const extLength = path.extname(name).length;
     const basename = extLength > 0 ? name.slice(0, -extLength) : name;
-    return `${basename}.${this.outputExtension}`;
+    return `${basename}.${this.ext}`;
   }
 
   async save(outDir: string): Promise<void> {
@@ -120,11 +152,9 @@ export abstract class Debundle {
     this.commitAstMods();
 
     for (const item of this.allModulesAllChunks()) {
-      const { ast, name, type } = item;
+      const { ast, name } = item;
       const outputCode = generate(ast).code;
-      const outFile = this.formatFileName(name);
-      const dir = type === "chunk" ? outDir : moduleDir;
-      promises.push(fs.writeFile(path.join(dir, outFile), outputCode));
+      promises.push(fs.writeFile(path.join(outDir, name), outputCode));
     }
 
     const { moduleGraph: graph } = this;

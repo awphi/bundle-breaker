@@ -25,16 +25,13 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
     });
 
     test("can be deobfuscated", () => {
-      const mockChunkId = "mock-chunk.test.js";
-      // naughty insertion of a mock chunk that we know will be deobfuscated to check that the AST is properly modified
-      (deb as any).chunks.set(mockChunkId, {
-        ast: structuredClone(mockChunk),
-        name: mockChunkId,
-        bytes: 0,
-        type: "chunk",
-      });
+      const { ast } = deb.addChunk(
+        "mock-chunk",
+        structuredClone(mockChunk) as any
+      );
+      expect(ast).toBeDefined();
       deb.deobfuscate();
-      expect(deb.getChunk(mockChunkId).ast).not.toMatchObject(mockChunk);
+      expect(ast).not.toMatchObject(mockChunk);
     });
 
     test("can be graphed", () => {
@@ -43,8 +40,21 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
       expect(graph.size).toBeGreaterThan(0);
     });
 
-    test("respects passed file extension", () => {
+    test("module and chunk IDs are correctly formatted", () => {
       deb = debundle(files, "cjs");
+
+      // chunks should all be on the top-level dir
+      for (const file of deb.allChunks()) {
+        expect(file.name.includes("/")).toBe(false);
+      }
+
+      // modules should all live in the modules dir with a custom name
+      for (const file of deb.allModules()) {
+        expect(file.name.startsWith("modules")).toBe(true);
+        expect(file.name).not.toBe(file.originalId);
+      }
+
+      // all chunks AND modules should respect the passed extension
       for (const file of deb.allModulesAllChunks()) {
         expect(file.name.endsWith(".cjs")).toBe(true);
       }

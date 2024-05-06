@@ -222,14 +222,14 @@ export class WebpackDebundle extends Debundle {
     super(files, outputExtension);
 
     const potentialRuntimeChunks =
-      knownEntry && this.chunks.has(knownEntry)
-        ? [this.chunks.get(knownEntry)].values()
-        : this.chunks.values();
+      knownEntry && this.getChunk(knownEntry)
+        ? [this.getChunk(knownEntry)].values()
+        : this.allChunks();
 
     const runtimeChunkInfo = findRuntimeChunk(potentialRuntimeChunks);
     this.runtimeChunkInfo = runtimeChunkInfo;
 
-    for (const chunk of this.chunks.values()) {
+    for (const chunk of this.allChunks()) {
       const { name } = chunk;
       const isRuntimeChunk = chunk === runtimeChunkInfo.chunk;
       const { moduleFns, moduleMapExpr } = isRuntimeChunk
@@ -237,11 +237,10 @@ export class WebpackDebundle extends Debundle {
         : findAdditionalChunkModuleMap(chunk);
 
       for (const [moduleId, moduleFn] of Object.entries(moduleFns)) {
-        if (this.modules.has(moduleId)) {
+        const exisitingModule = this.getModule(moduleId);
+        if (exisitingModule) {
           throw new Error(
-            `Encountered module ID clash '${moduleId}' - found in ${
-              this.modules.get(moduleId).src
-            } and ${name}.`
+            `Encountered module ID clash '${moduleId}' - found in ${exisitingModule.src} and ${name}.`
           );
         }
 
@@ -253,12 +252,7 @@ export class WebpackDebundle extends Debundle {
             ),
           ])
         );
-        this.modules.set(moduleId, {
-          name: this.formatFileName(hash(ast)),
-          ast,
-          src: chunk,
-          type: "module",
-        });
+        this.addModule(moduleId, hash(ast), chunk, ast);
       }
 
       if (!isRuntimeChunk) {
@@ -281,36 +275,13 @@ export class WebpackDebundle extends Debundle {
     const moduleMapMemberExprWithFallback = t.logicalExpression(
       "||",
       runtimeModuleMapMemberExpr,
-      t.binaryExpression(
-        "+",
-        t.stringLiteral(MODULES_DIR + "/"),
-        runtimeModuleMapMemberExpr.property as t.Expression
-      )
-    );
-
-    const moduleMappingFileName = this.formatFileName("module_mapping");
-
-    this.addAstMods(
-      runtimeChunkInfo.chunk,
-      replace(
-        runtimeModuleMapMemberExpr,
-        t.callExpression(requireId, [moduleMapMemberExprWithFallback])
-      ),
-      replace(
-        runtimeChunkInfo.moduleMap.moduleMapExpr,
-        t.callExpression(requireId, [
-          t.stringLiteral(`./${moduleMappingFileName}`),
-        ])
-      )
+      runtimeModuleMapMemberExpr.property as t.Expression
     );
 
     // objects and arrays are indexed in the same way so just use an object for simplicity's sake
     const moduleMapObjectExpr = t.objectExpression(
-      [...this.modules.entries()].map(([k, m]) =>
-        t.objectProperty(
-          t.stringLiteral(k),
-          t.stringLiteral(`${MODULES_DIR}/${m.name}`)
-        )
+      [...this.allModules()].map(({ originalId, name }) =>
+        t.objectProperty(t.stringLiteral(originalId), t.stringLiteral(name))
       )
     );
 
@@ -322,15 +293,25 @@ export class WebpackDebundle extends Debundle {
       ])
     );
 
-    this.chunks.set(moduleMappingFileName, {
-      ast: moduleMappingAst,
-      bytes: 0,
-      name: moduleMappingFileName,
-      type: "chunk",
-    });
+    const { name: moduleMappingId } = this.addChunk(
+      "module_mapping",
+      moduleMappingAst
+    );
 
-    for (const [moduleId, { ast }] of this.modules.entries()) {
-      t.addComment(ast, "leading", ` Webpack module ID: '${moduleId}' `);
+    this.addAstMods(
+      runtimeChunkInfo.chunk,
+      replace(
+        runtimeModuleMapMemberExpr,
+        t.callExpression(requireId, [moduleMapMemberExprWithFallback])
+      ),
+      replace(
+        runtimeChunkInfo.moduleMap.moduleMapExpr,
+        t.callExpression(requireId, [t.stringLiteral(moduleMappingId)])
+      )
+    );
+
+    for (const { ast, originalId } of this.allModules()) {
+      t.addComment(ast, "leading", ` Webpack module ID: '${originalId}' `);
     }
 
     this.commitAstMods();
@@ -339,7 +320,7 @@ export class WebpackDebundle extends Debundle {
   private forEachWebpackRequireFnCall(
     callback: (fileName: string, path: NodePath<WebpackRequireFnCall>) => void
   ): void {
-    for (const mod of this.modules.values()) {
+    for (const mod of this.allModules()) {
       const expr = mod.ast.program.body[0];
       if (
         !(
@@ -366,10 +347,9 @@ export class WebpackDebundle extends Debundle {
   }
 
   protected graphInternal(): DirectedGraph {
-    const { modules } = this;
     const graph = new DirectedGraph({ allowSelfLoops: false });
     const runtimeChunk = this.runtimeChunkInfo.chunk;
-    for (const { name } of this.modules.values()) {
+    for (const { name } of this.allModules()) {
       graph.addNode(name, { label: name, file_type: "module" });
     }
     graph.addNode(runtimeChunk.name, {
@@ -381,7 +361,7 @@ export class WebpackDebundle extends Debundle {
       const id = path.node.arguments[0].value.toString();
       // check in the module cache first (which effectively stores module_mapping in memory) for the name
       // if not found then assume we're dealing with the name already (TODO might make sense to validate this assumption)
-      const moduleId = modules.get(id)?.name ?? id;
+      const moduleId = this.getModule(id)?.name ?? id;
       if (!graph.hasEdge(moduleId, name)) {
         graph.addDirectedEdge(moduleId, name);
       }

@@ -21,6 +21,7 @@ export interface Chunk extends NamedAST {
 export interface Module extends NamedAST {
   src: Chunk;
   type: "module";
+  originalId: string;
 }
 
 export interface DeobfsucateOpts {
