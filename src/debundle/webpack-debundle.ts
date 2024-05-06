@@ -5,13 +5,13 @@ import { Chunk, NamedAST } from "../types";
 import { DirectedGraph } from "graphology";
 
 import {
-  MODULES_DIR,
   isAnyFunctionExpression,
   getIifeCallExpression,
   maybeUnwrapTopLevelIife,
+  cyrb64Hash,
 } from "../utils";
 import { replace } from "../visitor/common";
-import hash from "hash-sum";
+import generate from "@babel/generator";
 
 export type WebpackRequireFnCall = t.CallExpression & {
   arguments: [t.StringLiteral | t.NumericLiteral];
@@ -252,7 +252,7 @@ export class WebpackDebundle extends Debundle {
             ),
           ])
         );
-        this.addModule(moduleId, hash(ast), chunk, ast);
+        this.addModule(moduleId, cyrb64Hash(generate(ast).code), chunk, ast);
       }
 
       if (!isRuntimeChunk) {

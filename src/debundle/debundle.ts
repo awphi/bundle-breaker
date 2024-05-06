@@ -6,6 +6,7 @@ import { Chunk, DeobfsucateOpts, Module, NamedAST } from "../types";
 import {
   GRAPH_FILE,
   MODULES_DIR,
+  cyrb64Hash,
   ensureDirectory,
   formatBytes,
 } from "../utils";
@@ -13,7 +14,6 @@ import { DirectedGraph } from "graphology";
 import gexf from "graphology-gexf";
 import traverse, { Visitor } from "@babel/traverse";
 import * as deobfuscate from "../visitor/deobfuscate";
-import hash from "hash-sum";
 import * as t from "@babel/types";
 
 const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
@@ -42,7 +42,13 @@ export abstract class Debundle {
   }
 
   private updateId(): void {
-    this.id = hash([...this.allModulesAllChunks()].map((a) => a.ast));
+    const allModulesAndChunks = [...this.allModulesAllChunks()].sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+    // generating the code and hashing the resultant string is faster than trying to hash a js object with hash-sum or object-hash :o
+    this.id = cyrb64Hash(
+      allModulesAndChunks.map((a) => generate(a.ast)).join("-")
+    );
   }
 
   getId(): string {
