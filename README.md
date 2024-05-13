@@ -4,17 +4,11 @@ TODO npm banner
 
 `bundle-breaker` is a CLI and JS API to make reverse-engineering bundled JavaScript applications easy and accessible. This can comprise of the separation, grouping, naming, pruning, deobfuscation and rebundling of production-built JavaScript applications.
 
-The tool aims to work with to the majority bundler configurations and versions. Notably this includes:
-
-- Webpack 4 and 5
-- All `webpack.ids` plugins
-- Bundles split across multiple bundles
-- Runtime-only chunks
-- ... and everything between!
-
-If you find a config that doesn't work as you'd expect and the relevant option(s)/version(s) are not listed in the known limitations please raise an issue.
-
 # Features
+
+- **Cross-platform** - Core API functions both in Node and the browser
+- **Well-tested** - Every change is tested against a suite of up-to-date generate bundle configs
+- **Multi-functional** - Supports a wide range of operations beyond debundling to make your reverse-engineered bundle dramatically easier to understand (see below for details)
 
 ## Debundle
 
@@ -91,6 +85,24 @@ TODO
 ## Prune
 
 TODO
+
+# Supported bundlers and config options
+
+The tool aims to work with to the majority bundler configurations and versions. Notably this includes:
+
+- Webpack 4 and 5
+- All `webpack.ids` plugins
+- Bundles split across multiple bundles
+- Runtime-only chunks
+- ... and (hopefully) everything between!
+
+If you find a config that doesn't work as you'd expect and the relevant option(s)/version(s) are not listed in the known limitations below please raise an issue.
+
+## Known limitations
+
+| Bundler | Date added | Limitation                                                               |
+| ------- | ---------- | ------------------------------------------------------------------------ |
+| WP5     | 09/05/24   | Multi-chunk bundles with any `output.chunkFormat` besides `'array-push'` |
 
 # Development Quickstart
 

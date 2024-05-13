@@ -1,17 +1,9 @@
-import path from "path";
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
-import fs from "fs/promises";
 import { Chunk, DeobfsucateOpts, Module, NamedAST } from "../types";
-import {
-  GRAPH_FILE,
-  MODULES_DIR,
-  cyrb64Hash,
-  ensureDirectory,
-  formatBytes,
-} from "../utils";
+import { MODULES_DIR, cyrb64Hash, extname, formatBytes } from "../utils";
 import { DirectedGraph } from "graphology";
-import gexf from "graphology-gexf";
+
 import traverse, { Visitor } from "@babel/traverse";
 import * as deobfuscate from "../visitor/deobfuscate";
 import * as t from "@babel/types";
@@ -125,10 +117,7 @@ export abstract class Debundle {
     src: Chunk,
     ast: t.File
   ): Readonly<Module> {
-    const name = path.posix.join(
-      MODULES_DIR,
-      this.formatModuleOrChunkName(baseName)
-    );
+    const name = MODULES_DIR + "/" + this.formatModuleOrChunkName(baseName);
     const mod: Readonly<Module> = {
       type: "module",
       ast,
@@ -144,41 +133,22 @@ export abstract class Debundle {
   }
 
   private formatModuleOrChunkName(name: string): string {
-    const extLength = path.extname(name).length;
+    const extLength = extname(name).length;
     const basename = extLength > 0 ? name.slice(0, -extLength) : name;
     return `${basename}.${this.ext}`;
   }
 
-  async save(outDir: string): Promise<void> {
-    const moduleDir = path.resolve(outDir, MODULES_DIR);
-
-    const promises: Promise<void>[] = [];
-    await ensureDirectory(moduleDir, false, true);
-
-    this.commitAstMods();
-
-    for (const item of this.allModulesAllChunks()) {
-      const { ast, name } = item;
-      const outputCode = generate(ast).code;
-      promises.push(fs.writeFile(path.join(outDir, name), outputCode));
-    }
-
-    const { moduleGraph: graph } = this;
-    if (graph !== undefined) {
-      const graphStr = gexf.write(graph);
-      promises.push(fs.writeFile(path.join(outDir, GRAPH_FILE), graphStr));
-    }
-
-    await Promise.all(promises);
-  }
-
   graph(useCache: boolean = true): DirectedGraph {
-    if (useCache && this.moduleGraph !== undefined) {
+    if (useCache && this.hasGraph()) {
       return this.moduleGraph;
     }
 
     this.moduleGraph = this.graphInternal();
     return this.moduleGraph;
+  }
+
+  hasGraph(): boolean {
+    return this.moduleGraph !== undefined;
   }
 
   *allModules() {

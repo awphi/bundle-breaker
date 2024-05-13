@@ -1,5 +1,3 @@
-import path from "path";
-import fs from "fs/promises";
 import type { AnyFunctionExpression, IifeCallExpression } from "./types";
 import * as t from "@babel/types";
 
@@ -68,34 +66,6 @@ export function formatBytes(bytes: number, si = false, dp = 1): string {
   return bytes.toFixed(dp) + " " + units[u];
 }
 
-// ensure a directory exists, is a directory, and optionally empty it or create it
-export async function ensureDirectory(
-  pth: string,
-  clear: boolean,
-  create: boolean
-): Promise<void> {
-  let exists = false;
-  try {
-    const stat = await fs.stat(pth);
-    if (!stat.isDirectory()) {
-      await fs.rm(pth, { recursive: true });
-    } else {
-      exists = true;
-    }
-  } catch (e) {}
-
-  if (!exists && create) {
-    await fs.mkdir(pth, { recursive: true });
-  }
-
-  if (clear) {
-    const contents = await fs.readdir(pth);
-    await Promise.all(
-      contents.map((name) => fs.rm(path.join(pth, name), { recursive: true }))
-    );
-  }
-}
-
 export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
   // try to extract the actual top-level meat of the program - this should be the require fn, module cache and entry user code IIFE etc.
   if (program.body.length === 1) {
@@ -135,4 +105,21 @@ export function cyrb64Hash(str: string, seed = 0): string {
   h2 = h2 >>> 0;
   h1 = h1 >>> 0;
   return h2.toString(36).padStart(7, "0") + h1.toString(36).padStart(7, "0");
+}
+
+// simple platform-agnostic (mostly backwards compatible) path.extname
+export function extname(pth: string): string {
+  const parts = pth.split(".");
+  if (parts.length === 1) {
+    return "";
+  }
+
+  const base = parts.slice(0, -1).join(".");
+  const ext = parts[parts.length - 1];
+
+  if (base.length == 0) {
+    return "";
+  }
+
+  return "." + ext;
 }
