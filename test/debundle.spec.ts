@@ -45,18 +45,18 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
 
       // chunks should all be on the top-level dir
       for (const file of deb.allChunks()) {
-        expect(file.name.includes("/")).toBe(false);
+        expect(file.name).not.toMatch(/\//);
       }
 
       // modules should all live in the modules dir with a custom name
       for (const file of deb.allModules()) {
-        expect(file.name.startsWith("modules")).toBe(true);
+        expect(file.name).toMatch(/^modules.*/);
         expect(file.name).not.toBe(file.originalId);
       }
 
       // all chunks AND modules should respect the passed extension
       for (const file of deb.allModulesAllChunks()) {
-        expect(file.name.endsWith(".cjs")).toBe(true);
+        expect(file.name).toMatch(/^(.*)\.cjs$/);
       }
     });
   });

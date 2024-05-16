@@ -1,7 +1,7 @@
 import type { AnyFunctionExpression, IifeCallExpression } from "./types";
 import * as t from "@babel/types";
 
-export const MODULES_DIR = "./modules";
+export const MODULES_DIR = "modules";
 export const GRAPH_FILE = "graph.gexf";
 
 export function isAnyFunctionExpression(
