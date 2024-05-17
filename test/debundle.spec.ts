@@ -1,6 +1,6 @@
 import { expect, test, describe, beforeEach } from "vitest";
 import { debundle, Debundle, WebpackDebundle } from "bundle-breaker";
-import { listExamples, readBundle } from "./helpers";
+import { listExamples, readBundle, resolveExample } from "./helpers";
 import path from "path";
 import mockChunk from "./mock-chunk.json";
 
@@ -40,6 +40,22 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
       expect(graph.size).toBeGreaterThan(0);
     });
 
+    test("files can be renamed", () => {
+      const originalFileNames = [...deb.allModulesAllChunks()].map(
+        (a) => a.name
+      );
+      const renames: Record<string, string> = Object.fromEntries(
+        originalFileNames.map((a, i) => [a, `newName_${i}`])
+      );
+      deb.updateNames(renames);
+      const newFileNames = [...deb.allModulesAllChunks()].map((a) => a.name);
+
+      expect(originalFileNames).not.toStrictEqual(newFileNames);
+      for (const newName of newFileNames) {
+        expect(newName).toMatch(/^(modules\/)?newName_.*/);
+      }
+    });
+
     test("module and chunk IDs are correctly formatted", () => {
       deb = debundle(files, "cjs");
 
@@ -51,7 +67,6 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
       // modules should all live in the modules dir with a custom name
       for (const file of deb.allModules()) {
         expect(file.name).toMatch(/^modules.*/);
-        expect(file.name).not.toBe(file.originalId);
       }
 
       // all chunks AND modules should respect the passed extension
@@ -59,5 +74,22 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
         expect(file.name).toMatch(/^(.*)\.cjs$/);
       }
     });
+  });
+});
+
+describe("Webpack", () => {
+  test("renaming files modifies ASTs", () => {
+    const files = readBundle(
+      path.join(resolveExample("webpack4/simple"), "out")
+    );
+    const deb = debundle(files, "js");
+    const originalModules = [...deb.allModules()];
+    const originalAsts = originalModules.map((a) => structuredClone(a.ast));
+    const renames: Record<string, string> = Object.fromEntries(
+      originalModules.map((a, i) => [a.name, `newName_${i}`])
+    );
+    deb.updateNames(renames);
+    const newAsts = originalModules.map((a) => structuredClone(a.ast));
+    expect(newAsts).not.toStrictEqual(originalAsts);
   });
 });

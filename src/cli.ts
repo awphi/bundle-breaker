@@ -52,9 +52,6 @@ program
 
     if (options.deobfuscate) {
       deb.deobfuscate();
-      if (deb instanceof WebpackDebundle) {
-        deb.rewriteImports();
-      }
     }
 
     if (options.graph) {

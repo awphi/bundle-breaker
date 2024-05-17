@@ -21,7 +21,6 @@ export interface Chunk extends NamedAST {
 export interface Module extends NamedAST {
   src: Chunk;
   type: "module";
-  originalId: string;
 }
 
 export interface DeobfsucateOpts {
@@ -33,3 +32,7 @@ export interface DeobfsucateOpts {
   enforceBlockStatementsOnIfs?: boolean;
   splitVariableDeclarators?: boolean;
 }
+
+export type Mutable<T> = {
+  -readonly [P in keyof T]: T[P];
+};

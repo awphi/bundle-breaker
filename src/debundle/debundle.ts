@@ -1,6 +1,6 @@
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
-import { Chunk, DeobfsucateOpts, Module, NamedAST } from "../types";
+import { Chunk, DeobfsucateOpts, Module, Mutable, NamedAST } from "../types";
 import { MODULES_DIR, cyrb64Hash, extname, formatBytes } from "../utils";
 import { DirectedGraph } from "graphology";
 
@@ -20,7 +20,11 @@ const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
 
 export abstract class Debundle {
   private chunks: Map<string, Readonly<Chunk>> = new Map();
+
+  // `moduleAliases` maps onto the same module items as the main `modules` map but its keys don't change and are only used internally
+  private moduleAliases: Map<string, Readonly<Module>> = new Map();
   private modules: Map<string, Readonly<Module>> = new Map();
+
   protected pendingAstMods: Map<NamedAST, Visitor<unknown>[]> = new Map();
   protected id: string;
 
@@ -60,7 +64,7 @@ export abstract class Debundle {
   }
 
   getModule(id: string): Readonly<Module> | undefined {
-    return this.modules.get(id);
+    return this.modules.get(id) ?? this.moduleAliases.get(id);
   }
 
   debug(): void {
@@ -106,16 +110,15 @@ export abstract class Debundle {
       name,
     };
 
-    // chunks are indexed by their formatted name as it doesn't change
     this.chunks.set(name, chunk);
     return chunk;
   }
 
   addModule(
-    id: string,
     baseName: string,
     src: Chunk,
-    ast: t.File
+    ast: t.File,
+    aliases: string[] = []
   ): Readonly<Module> {
     const name = MODULES_DIR + "/" + this.formatModuleOrChunkName(baseName);
     const mod: Readonly<Module> = {
@@ -123,14 +126,44 @@ export abstract class Debundle {
       ast,
       name,
       src,
-      originalId: id,
     };
 
-    // the module cache is indexed by the original ID from the source bundle rather than our custom name
-    this.modules.set(id, mod);
+    this.modules.set(name, mod);
+
+    // some types of bundles have internal module IDs that it's useful to be able to index so we support
+    // aliasing these here - they should always be unique
+    for (const alias of aliases) {
+      this.moduleAliases.set(alias, mod);
+    }
 
     return mod;
   }
+
+  updateNames(renames: Record<string, string>): void {
+    // keep track of the changed names
+    const changedNames = new Map<string, string>();
+
+    for (const [from, to] of Object.entries(renames)) {
+      const item: Mutable<Module | Chunk> =
+        this.getModule(from) ?? this.getChunk(from);
+      const map = item.type === "module" ? this.modules : this.chunks;
+
+      let newName = this.formatModuleOrChunkName(to);
+      if (item.type === "module") {
+        newName = MODULES_DIR + "/" + newName;
+      }
+
+      // update the map key and the name
+      changedNames.set(item.name, newName);
+      map.delete(item.name);
+      item.name = newName;
+      map.set(item.name, item as any);
+    }
+
+    this.updateNamesInternal(changedNames);
+  }
+
+  protected updateNamesInternal(renames: Map<string, string>) {}
 
   private formatModuleOrChunkName(name: string): string {
     const extLength = extname(name).length;

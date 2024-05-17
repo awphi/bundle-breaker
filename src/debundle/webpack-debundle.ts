@@ -231,6 +231,8 @@ export class WebpackDebundle extends Debundle {
     const runtimeChunkInfo = findRuntimeChunk(potentialRuntimeChunks);
     this.runtimeChunkInfo = runtimeChunkInfo;
 
+    const originalIdMap = new Map<string, string>();
+
     for (const chunk of this.allChunks()) {
       const { name } = chunk;
       const isRuntimeChunk = chunk === runtimeChunkInfo.chunk;
@@ -254,7 +256,15 @@ export class WebpackDebundle extends Debundle {
             ),
           ])
         );
-        this.addModule(moduleId, cyrb64Hash(generate(ast).code), chunk, ast);
+        t.addComment(ast, "leading", ` Original module ID: '${moduleId}' `);
+
+        const moduleResult = this.addModule(
+          cyrb64Hash(generate(ast).code),
+          chunk,
+          ast,
+          [moduleId]
+        );
+        originalIdMap.set(moduleId, moduleResult.name);
       }
 
       if (!isRuntimeChunk) {
@@ -282,7 +292,7 @@ export class WebpackDebundle extends Debundle {
 
     // objects and arrays are indexed in the same way so just use an object for simplicity's sake
     const moduleMapObjectExpr = t.objectExpression(
-      [...this.allModules()].map(({ originalId, name }) =>
+      [...originalIdMap.entries()].map(([originalId, name]) =>
         t.objectProperty(t.stringLiteral(originalId), t.stringLiteral(name))
       )
     );
@@ -312,11 +322,8 @@ export class WebpackDebundle extends Debundle {
       )
     );
 
-    for (const { ast, originalId } of this.allModules()) {
-      t.addComment(ast, "leading", ` Webpack module ID: '${originalId}' `);
-    }
-
     this.commitAstMods();
+    this.updateNamesInternal(originalIdMap);
   }
 
   private forEachWebpackRequireFnCall(
@@ -372,14 +379,15 @@ export class WebpackDebundle extends Debundle {
     return graph;
   }
 
-  rewriteImports(): void {
+  protected updateNamesInternal(renames: Map<string, string>) {
     this.forEachWebpackRequireFnCall((_, path) => {
       const arg = path.get("arguments")[0];
-      const { name } = this.getModule(arg.node.value.toString());
-      // replace with name and nothing else to avoid breaking module graph construction
-      const literal = t.stringLiteral(name);
-      t.addComment(literal, "inner", arg.node.value.toString());
-      arg.replaceWith(literal);
+      const newName = renames.get(arg.node.value.toString());
+      if (newName) {
+        const literal = t.stringLiteral(newName);
+        t.addComment(literal, "inner", arg.node.value.toString());
+        arg.replaceWith(literal);
+      }
     });
   }
 }
