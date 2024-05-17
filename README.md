@@ -6,7 +6,7 @@ TODO npm banner
 
 # Features
 
-- **Cross-platform** - Core API functions both in Node and the browser
+- **CLI & JS API** - Exposes a robust internal API for programatically creating and modifying reverse-engineering projects on top of a simple, user-friendly CLI
 - **Well-tested** - Every change is tested against a suite of up-to-date generate bundle configs
 - **Multi-functional** - Supports a wide range of operations beyond debundling to make your reverse-engineered bundle dramatically easier to understand (see below for details)
 

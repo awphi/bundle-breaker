@@ -1,12 +1,12 @@
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
 import { Chunk, DeobfsucateOpts, Module, Mutable, NamedAST } from "../types";
-import { MODULES_DIR, cyrb64Hash, extname, formatBytes } from "../utils";
+import { MODULES_DIR, cyrb64Hash, formatBytes } from "../utils";
 import { DirectedGraph } from "graphology";
-
 import traverse, { Visitor } from "@babel/traverse";
 import * as deobfuscate from "../visitor/deobfuscate";
 import * as t from "@babel/types";
+import path from "path/posix";
 
 const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
   flipLiterals: true,
@@ -120,7 +120,7 @@ export abstract class Debundle {
     ast: t.File,
     aliases: string[] = []
   ): Readonly<Module> {
-    const name = MODULES_DIR + "/" + this.formatModuleOrChunkName(baseName);
+    const name = path.join(MODULES_DIR, this.formatModuleOrChunkName(baseName));
     const mod: Readonly<Module> = {
       type: "module",
       ast,
@@ -150,7 +150,7 @@ export abstract class Debundle {
 
       let newName = this.formatModuleOrChunkName(to);
       if (item.type === "module") {
-        newName = MODULES_DIR + "/" + newName;
+        newName = path.join(MODULES_DIR, newName);
       }
 
       // update the map key and the name
@@ -166,7 +166,7 @@ export abstract class Debundle {
   protected updateNamesInternal(renames: Map<string, string>) {}
 
   private formatModuleOrChunkName(name: string): string {
-    const extLength = extname(name).length;
+    const extLength = path.extname(name).length;
     const basename = extLength > 0 ? name.slice(0, -extLength) : name;
     return `${basename}.${this.ext}`;
   }

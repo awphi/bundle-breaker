@@ -106,20 +106,3 @@ export function cyrb64Hash(str: string, seed = 0): string {
   h1 = h1 >>> 0;
   return h2.toString(36).padStart(7, "0") + h1.toString(36).padStart(7, "0");
 }
-
-// simple platform-agnostic (mostly backwards compatible) path.extname
-export function extname(pth: string): string {
-  const parts = pth.split(".");
-  if (parts.length === 1) {
-    return "";
-  }
-
-  const base = parts.slice(0, -1).join(".");
-  const ext = parts[parts.length - 1];
-
-  if (base.length == 0) {
-    return "";
-  }
-
-  return "." + ext;
-}
