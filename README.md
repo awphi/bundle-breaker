@@ -1,13 +1,11 @@
 # bundle-breaker
 
-TODO npm banner
-
 `bundle-breaker` is a CLI and JS API to make reverse-engineering bundled JavaScript applications easy and accessible. This can comprise of the separation, grouping, naming, pruning, deobfuscation and rebundling of production-built JavaScript applications.
 
 # Features
 
-- **CLI & JS API** - Exposes a robust internal API for programatically creating and modifying reverse-engineering projects on top of a simple, user-friendly CLI
-- **Well-tested** - Every change is tested against a suite of up-to-date generate bundle configs
+- **CLI & JS API** - Exposes a robust JS API as well as a simple, user-friendly CLI for creating and modifying reverse-engineering projects
+- **Well-tested** - Every change is tested against a suite of up-to-date generated bundle configs
 - **Multi-functional** - Supports a wide range of operations beyond debundling to make your reverse-engineered bundle dramatically easier to understand (see below for details)
 
 ## Debundle
@@ -21,8 +19,8 @@ import { debundle } from "bundle-breaker";
 
 const files = { "index.js": "...", "chunk.js": "..." };
 const deb = debundle(files);
-// use debundle API as needed, for example:
-deb.debug();
+// use debundle API as needed, for example; logging its unique identifier
+console.log(deb.getId());
 ```
 
 CLI:
@@ -36,13 +34,38 @@ When used via the CLI, `bundle-breaker` will write your debundled application to
 ```
 out/
 ├─ modules/
-│  ├─ bb_module_1.js
-│  ├─ bb_module_2.js
-│  ├─ bb_module_3.js
+│  ├─ module_1.js
+│  ├─ module_2.js
+│  ├─ module_3.js
 ├─ index.js
 ├─ chunk_1.js
 ├─ chunk_2.js
-├─ ...extra metadata. depending on options (e.g. graph.gexf)..
+├─ ...extra metadata depending on options/input bundle (e.g. graph.gexf, module_mapping.js etc.)...
+```
+
+## Deobfuscate
+
+`bundle-breaker` supports a handful of deobfuscation codemods you can apply to reverse common minification strategies and make your debundled code more readable. All of these codemods are safe and should never change the functionality of the code. Examples of the supported processors are; unminifying boolean literals, to flipping literals and identifiers in `if` statements, breaking sequence expressions into individual statements, and many more. [See the full list of support techniques here](https://github.com/awphi/bundle-breaker/blob/main/src/types.ts#L25).
+
+CLI:
+
+```sh
+npx bundle-breaker -cd path/to/bundle ./out
+```
+
+When used via the CLI you can enable deobfuscation by appending the `-d` or `--deobfuscate` option. This will enable all supported deobfuscators. For more fine-grained control over which deobfuscation techniques will be applied you may wish to try the JS API.
+
+JS API:
+
+```javascript
+import { debundle } from "bundle-breaker";
+
+const files = { "index.js": "...", "chunk.js": "..." };
+const deb = debundle(files);
+
+// opt-out of a given deobfuscator
+const deobOpts = { flipLiterals: false };
+deb.deobfuscate(deobOpts);
 ```
 
 ## Graph
@@ -72,11 +95,55 @@ When using the CLI you can simply append the `-g` or `--graph` option to include
 
 ## Name
 
-TODO
+`bundle-breaker` supports renaming/remapping your file names to something more legible. If you have a set of known file name mappings to hand you can manually parse them to the application. This will also update any `import`/`require` your chosen bundler may use, making your debundled codebase easier to traverse manually.
 
-## Deobfuscate
+CLI:
 
-TODO
+```sh
+npx bundle-breaker -c -f path/to/file-name-map.json path/to/bundle ./out
+```
+
+JS API:
+
+```javascript
+import { debundle } from "bundle-breaker";
+
+const files = { "index.js": "...", "chunk.js": "..." };
+const fileRenames = { "abc123.js": "foo-bar.js", "...": "..." };
+const deb = debundle(files);
+deb.updateNames(fileRenames);
+```
+
+However, since source file names are usually lost in the bundling/minification process, `bundle-breaker` also supports automatic file renaming. This is powered by OpenAI's large language models. This allows us to easily automate the tedious process of inferring the purpose of code - even with minimal deobfuscation. Thanks to the sheer size of these models, this achieves a very solid level of accuracy.
+
+CLI:
+
+```sh
+OPENAI_API_KEY=foobar npx bundle-breaker -c -f auto path/to/bundle ./out
+```
+
+To use automatic file renaming via the CLI you must ensure you have set the `OPENAI_API_KEY` environment variable. You could choose to do this via something like (dotenv)[https://www.npmjs.com/package/dotenv] or [.env support in Node v20.6+](https://nodejs.org/en/blog/release/v20.6.0#built-in-env-file-support) if you so wish.
+
+```javascript
+import { debundle, OpenAIAssistant } from "bundle-breaker";
+
+const openAiApiKey = "foobar";
+const files = { "index.js": "...", "chunk.js": "..." };
+const deb = debundle(files);
+// create the API client with our key. this will default to process.env.OPENAI_API_KEY if omitted.
+const openAiClient = new OpenAIAssistant(openAiApiKey);
+// create a vector store containing all our debundle's files
+const vs = await openAiClient.getOrCreateVectorStore(deb);
+const renames = await openAiClient.computeFileRenames(vs);
+// ... we chould choose to save these computed renames to the disk for future use without needing the API again ...
+deb.updateNames(renames);
+```
+
+The `OpenAIAssistant` utility class is responsible for provisioning and managing all resources on the OpenAI servers via their API. It aims to produce minimal clutter. For example, `bundle-breaker` will only create one [assistant](https://platform.openai.com/docs/api-reference/assistants) per model you choose to use. It will also use the unique identifier of each debundle and its constituent files (which are calculated via hashing their ASTs) to avoid creating duplicate resources under your project.
+
+In general, it would be good practice to create a unique project on the OpenAI dashboard for each reverse-engineering project you work on to keep everything separate and make clean-up easy.
+
+> **Note**: Usage of automatic file renaming requires sending your debundled code to OpenAI's API. This means it should be avoided unless you have express permission of the original application's owner.
 
 ## Group
 

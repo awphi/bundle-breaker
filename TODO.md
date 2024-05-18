@@ -13,3 +13,4 @@
 - [ ] Docs via docusaurus (+ api-extractor for API ref?)
 - [ ] Playground for docs site - will need a server of some kind
 - [ ] Improve deobfuscation - LLM-based token renaming or more simple codemods?
+- [ ] Put on npm and add banner to README
