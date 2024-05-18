@@ -115,6 +115,10 @@ export abstract class Debundle {
     for (const [from, to] of Object.entries(renames)) {
       const item: Mutable<Module | Chunk> =
         this.getModule(from) ?? this.getChunk(from);
+      if (!item) {
+        continue;
+      }
+
       const map = item.type === "module" ? this.modules : this.chunks;
 
       let newName = this.formatModuleOrChunkName(to);
@@ -132,7 +136,7 @@ export abstract class Debundle {
     this.updateNamesInternal(changedNames);
   }
 
-  protected updateNamesInternal(renames: Map<string, string>) {}
+  protected updateNamesInternal(_renames: Map<string, string>) {}
 
   private formatModuleOrChunkName(name: string): string {
     const extLength = path.extname(name).length;
@@ -180,7 +184,6 @@ export abstract class Debundle {
     }
 
     this.commitAstMods();
-    // TODO do LLM-powered renaming as appropriate
   }
 
   protected abstract graphInternal(): DirectedGraph;

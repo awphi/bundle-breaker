@@ -11,6 +11,7 @@ import {
 } from "./cli-utils";
 import { DEFAULT_DEOB_OPTS } from "./utils";
 import pc from "picocolors";
+import { OpenAIAssistant } from "./openai/client";
 
 const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 // use require() to prevent tsc copying package.json into the dist/ folder when building
@@ -32,6 +33,10 @@ program
     "apply code transformations on the output to reverse common obfuscation techniques"
   )
   .option("-ext, --extension <ext>", "file extension to use for output", "js")
+  .option(
+    "-f, --filenames <type>",
+    "file renaming behaviour. set to a path to a JSON file to use pre-computed renames or 'auto' to use GPT-powered renaming."
+  )
   .option("-s, --silent", "silence terminal logging for all operations")
   .option("-v, --verbose", "add extra detail to terminal logging")
   .action(async (baseInDir: string, baseOutDir: string, options: any) => {
@@ -110,6 +115,16 @@ program
         ["size", graph.size],
         ["order", graph.order],
       ]);
+    }
+
+    if (options.filenames === "auto") {
+      const openAiClient = new OpenAIAssistant();
+      const vs = await openAiClient.getOrCreateVectorStore(deb);
+      const renames = await openAiClient.computeFileRenames(vs);
+      console.log(renames);
+      deb.updateNames(renames);
+    } else if (options.filenames) {
+      // TODO - read precomputed filenames in and apply as needed
     }
 
     time = performance.now();

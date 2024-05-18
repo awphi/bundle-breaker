@@ -93,3 +93,5 @@ describe("Webpack", () => {
     expect(newAsts).not.toStrictEqual(originalAsts);
   });
 });
+
+// TODO add tests for auto-renaming

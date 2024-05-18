@@ -1,5 +1,6 @@
 import { Debundle } from "./debundle/debundle";
 import { WebpackDebundle } from "./debundle/webpack-debundle";
+import { OpenAIAssistant } from "./openai/client";
 
 export function debundle(
   files: Record<string, string>,
@@ -10,4 +11,4 @@ export function debundle(
   return new WebpackDebundle(files, extension, knownEntry);
 }
 
-export { WebpackDebundle, Debundle };
+export { WebpackDebundle, Debundle, OpenAIAssistant };

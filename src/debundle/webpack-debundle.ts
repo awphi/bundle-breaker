@@ -1,7 +1,7 @@
 import * as t from "@babel/types";
 import traverse, { NodePath } from "@babel/traverse";
 import { Debundle } from "./debundle";
-import { Chunk, NamedAST } from "../types";
+import { Chunk, Module, NamedAST } from "../types";
 import { DirectedGraph } from "graphology";
 
 import {
@@ -215,6 +215,7 @@ function forEachWebpackRequireFnCall(
 
 export class WebpackDebundle extends Debundle {
   private runtimeChunkInfo: WebpackRuntimeChunkInfo;
+  private originalIdMap = new Map<string, Module>();
 
   constructor(
     files: Record<string, string>,
@@ -230,8 +231,6 @@ export class WebpackDebundle extends Debundle {
 
     const runtimeChunkInfo = findRuntimeChunk(potentialRuntimeChunks);
     this.runtimeChunkInfo = runtimeChunkInfo;
-
-    const originalIdMap = new Map<string, string>();
 
     for (const chunk of this.allChunks()) {
       const { name } = chunk;
@@ -264,7 +263,7 @@ export class WebpackDebundle extends Debundle {
           ast,
           [moduleId]
         );
-        originalIdMap.set(moduleId, moduleResult.name);
+        this.originalIdMap.set(moduleId, moduleResult);
       }
 
       if (!isRuntimeChunk) {
@@ -290,9 +289,36 @@ export class WebpackDebundle extends Debundle {
       runtimeModuleMapMemberExpr.property as t.Expression
     );
 
+    const { name: moduleMappingChunkName } = this.updateModuleMappingChunk();
+
+    this.addAstMods(
+      runtimeChunkInfo.chunk,
+      replace(
+        runtimeModuleMapMemberExpr,
+        t.callExpression(requireId, [moduleMapMemberExprWithFallback])
+      ),
+      replace(
+        runtimeChunkInfo.moduleMap.moduleMapExpr,
+        t.callExpression(requireId, [t.stringLiteral(moduleMappingChunkName)])
+      )
+    );
+
+    this.commitAstMods();
+
+    this.updateNamesInternal(
+      new Map(
+        [...this.originalIdMap.entries()].map(([originalId, mod]) => [
+          originalId,
+          mod.name,
+        ])
+      )
+    );
+  }
+
+  private updateModuleMappingChunk(): Readonly<Chunk> {
     // objects and arrays are indexed in the same way so just use an object for simplicity's sake
     const moduleMapObjectExpr = t.objectExpression(
-      [...originalIdMap.entries()].map(([originalId, name]) =>
+      [...this.originalIdMap.entries()].map(([originalId, { name }]) =>
         t.objectProperty(t.stringLiteral(originalId), t.stringLiteral(name))
       )
     );
@@ -305,25 +331,7 @@ export class WebpackDebundle extends Debundle {
       ])
     );
 
-    const { name: moduleMappingId } = this.addChunk(
-      "module_mapping",
-      moduleMappingAst
-    );
-
-    this.addAstMods(
-      runtimeChunkInfo.chunk,
-      replace(
-        runtimeModuleMapMemberExpr,
-        t.callExpression(requireId, [moduleMapMemberExprWithFallback])
-      ),
-      replace(
-        runtimeChunkInfo.moduleMap.moduleMapExpr,
-        t.callExpression(requireId, [t.stringLiteral(moduleMappingId)])
-      )
-    );
-
-    this.commitAstMods();
-    this.updateNamesInternal(originalIdMap);
+    return this.addChunk("module_mapping", moduleMappingAst);
   }
 
   private forEachWebpackRequireFnCall(
@@ -389,5 +397,6 @@ export class WebpackDebundle extends Debundle {
         arg.replaceWith(literal);
       }
     });
+    this.updateModuleMappingChunk();
   }
 }
