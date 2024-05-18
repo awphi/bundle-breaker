@@ -14,7 +14,6 @@ export interface NamedAST {
 }
 
 export interface Chunk extends NamedAST {
-  bytes: number;
   type: "chunk";
 }
 

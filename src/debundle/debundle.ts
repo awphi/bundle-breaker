@@ -1,22 +1,12 @@
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
 import { Chunk, DeobfsucateOpts, Module, Mutable, NamedAST } from "../types";
-import { MODULES_DIR, cyrb64Hash, formatBytes } from "../utils";
+import { DEFAULT_DEOB_OPTS, MODULES_DIR, cyrb64Hash } from "../utils";
 import { DirectedGraph } from "graphology";
 import traverse, { Visitor } from "@babel/traverse";
 import * as deobfuscate from "../visitor/deobfuscate";
 import * as t from "@babel/types";
 import path from "path/posix";
-
-const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
-  flipLiterals: true,
-  voidLiteralToUndefined: true,
-  verboseTrueFalse: true,
-  decimalNumericLiterals: true,
-  breakSequenceExpressions: true,
-  enforceBlockStatementsOnIfs: true,
-  splitVariableDeclarators: true,
-};
 
 export abstract class Debundle {
   private chunks: Map<string, Readonly<Chunk>> = new Map();
@@ -51,14 +41,6 @@ export abstract class Debundle {
     return this.id;
   }
 
-  totalChunkSize(): number {
-    let c = 0;
-    for (const v of this.chunks.values()) {
-      c += v.bytes;
-    }
-    return c;
-  }
-
   getChunk(id: string): Readonly<Chunk> | undefined {
     return this.chunks.get(id);
   }
@@ -66,17 +48,6 @@ export abstract class Debundle {
   getModule(id: string): Readonly<Module> | undefined {
     return this.modules.get(id) ?? this.moduleAliases.get(id);
   }
-
-  debug(): void {
-    const chunkNames = [...this.chunks.keys()];
-    console.log(` - Debundle ID: ${this.id}`);
-    console.log(` - Chunks (${chunkNames.length}): ${chunkNames.join(", ")}`);
-    console.log(
-      ` - Total chunk(s) size: ${formatBytes(this.totalChunkSize())}`
-    );
-    console.log(` - Unique modules: ${this.modules.size}`);
-  }
-
   addAstMods(ast: NamedAST, ...mod: Visitor<unknown>[]): void {
     if (!this.pendingAstMods.has(ast)) {
       this.pendingAstMods.set(ast, []);
@@ -98,14 +69,12 @@ export abstract class Debundle {
   }
 
   addChunk(id: string, content: string | t.File): Readonly<Chunk> {
-    const textEncoder = new TextEncoder();
     const code = typeof content === "string" ? content : "";
     const ast = typeof content === "string" ? parser.parse(code) : content;
     const name = this.formatModuleOrChunkName(id);
 
     const chunk: Readonly<Chunk> = {
       type: "chunk",
-      bytes: textEncoder.encode(code).byteLength,
       ast,
       name,
     };

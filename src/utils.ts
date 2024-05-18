@@ -1,8 +1,22 @@
-import type { AnyFunctionExpression, IifeCallExpression } from "./types";
+import type {
+  AnyFunctionExpression,
+  DeobfsucateOpts,
+  IifeCallExpression,
+} from "./types";
 import * as t from "@babel/types";
 
 export const MODULES_DIR = "modules";
 export const GRAPH_FILE = "graph.gexf";
+
+export const DEFAULT_DEOB_OPTS: Required<DeobfsucateOpts> = {
+  flipLiterals: true,
+  voidLiteralToUndefined: true,
+  verboseTrueFalse: true,
+  decimalNumericLiterals: true,
+  breakSequenceExpressions: true,
+  enforceBlockStatementsOnIfs: true,
+  splitVariableDeclarators: true,
+};
 
 export function isAnyFunctionExpression(
   node: t.Node
@@ -29,41 +43,6 @@ export function getIifeCallExpression(
   }
 
   return undefined;
-}
-
-/**
- * Format bytes as human-readable text.
- * https://stackoverflow.com/questions/10420352/converting-file-size-in-bytes-to-human-readable-string
- *
- * @param bytes Number of bytes.
- * @param si True to use metric (SI) units, aka powers of 1000. False to use
- *           binary (IEC), aka powers of 1024.
- * @param dp Number of decimal places to display.
- *
- * @return Formatted string.
- */
-export function formatBytes(bytes: number, si = false, dp = 1): string {
-  const thresh = si ? 1000 : 1024;
-
-  if (Math.abs(bytes) < thresh) {
-    return bytes + " B";
-  }
-
-  const units = si
-    ? ["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
-    : ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
-  let u = -1;
-  const r = 10 ** dp;
-
-  do {
-    bytes /= thresh;
-    ++u;
-  } while (
-    Math.round(Math.abs(bytes) * r) / r >= thresh &&
-    u < units.length - 1
-  );
-
-  return bytes.toFixed(dp) + " " + units[u];
 }
 
 export function maybeUnwrapTopLevelIife(program: t.Program): t.Statement[] {
