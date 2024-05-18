@@ -11,6 +11,7 @@ export interface IifeCallExpression extends t.CallExpression {
 export interface NamedAST {
   name: string;
   ast: t.File;
+  immutable?: boolean;
 }
 
 export interface Chunk extends NamedAST {

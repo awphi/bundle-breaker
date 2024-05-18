@@ -49,10 +49,12 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
       );
       deb.updateNames(renames);
       const newFileNames = [...deb.allModulesAllChunks()].map((a) => a.name);
-
+      console.log(originalFileNames, newFileNames);
       expect(originalFileNames).not.toStrictEqual(newFileNames);
       for (const newName of newFileNames) {
-        expect(newName).toMatch(/^(modules\/)?newName_.*/);
+        expect(newName).toMatch(
+          /^((modules\/)?newName_.*)|module_mapping\.js$/
+        );
       }
     });
 

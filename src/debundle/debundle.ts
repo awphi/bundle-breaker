@@ -68,7 +68,11 @@ export abstract class Debundle {
     }
   }
 
-  addChunk(id: string, content: string | t.File): Readonly<Chunk> {
+  addChunk(
+    id: string,
+    content: string | t.File,
+    immutable?: boolean
+  ): Readonly<Chunk> {
     const code = typeof content === "string" ? content : "";
     const ast = typeof content === "string" ? parser.parse(code) : content;
     const name = this.formatModuleOrChunkName(id);
@@ -77,6 +81,7 @@ export abstract class Debundle {
       type: "chunk",
       ast,
       name,
+      immutable,
     };
 
     this.chunks.set(name, chunk);
@@ -115,7 +120,7 @@ export abstract class Debundle {
     for (const [from, to] of Object.entries(renames)) {
       const item: Mutable<Module | Chunk> =
         this.getModule(from) ?? this.getChunk(from);
-      if (!item) {
+      if (!item || item.immutable) {
         continue;
       }
 

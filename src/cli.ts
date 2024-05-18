@@ -121,8 +121,8 @@ program
       const openAiClient = new OpenAIAssistant();
       const vs = await openAiClient.getOrCreateVectorStore(deb);
       const renames = await openAiClient.computeFileRenames(vs);
-      console.log(renames);
       deb.updateNames(renames);
+      logTask("renamed", [["src", `auto (openai: ${openAiClient.model})`]]);
     } else if (options.filenames) {
       // TODO - read precomputed filenames in and apply as needed
     }

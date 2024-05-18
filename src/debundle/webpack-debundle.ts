@@ -331,7 +331,7 @@ export class WebpackDebundle extends Debundle {
       ])
     );
 
-    return this.addChunk("module_mapping", moduleMappingAst);
+    return this.addChunk("module_mapping", moduleMappingAst, true);
   }
 
   private forEachWebpackRequireFnCall(
