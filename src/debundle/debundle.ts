@@ -113,7 +113,7 @@ export abstract class Debundle {
     return mod;
   }
 
-  updateNames(renames: Record<string, string>): void {
+  updateNames(renames: Record<string, string>): Map<string, string> {
     // keep track of the changed names
     const changedNames = new Map<string, string>();
 
@@ -139,6 +139,7 @@ export abstract class Debundle {
     }
 
     this.updateNamesInternal(changedNames);
+    return changedNames;
   }
 
   protected updateNamesInternal(_renames: Map<string, string>) {}

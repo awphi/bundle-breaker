@@ -38,7 +38,7 @@ program
     "file renaming behaviour. set to a path to a JSON file to use pre-computed renames or 'auto' to use GPT-powered renaming."
   )
   .option("-s, --silent", "silence terminal logging for all operations")
-  .option("-v, --verbose", "add extra detail to terminal logging")
+  .option("--verbose", "add extra detail to terminal logging")
   .action(async (baseInDir: string, baseOutDir: string, options: any) => {
     const log = options.silent === true ? () => {} : console.log;
     let time = performance.now();
@@ -120,9 +120,17 @@ program
     if (options.filenames === "auto") {
       const openAiClient = new OpenAIAssistant();
       const vs = await openAiClient.getOrCreateVectorStore(deb);
+      logTask("obtained openai vector store", [
+        ["id", vs.id],
+        ["size", formatBytes(vs.usage_bytes)],
+        ["status", vs.status],
+      ]);
       const renames = await openAiClient.computeFileRenames(vs);
-      deb.updateNames(renames);
-      logTask("renamed", [["src", `auto (openai: ${openAiClient.model})`]]);
+      const actualRenames = deb.updateNames(renames);
+      logTask("renamed", [
+        ["src", `auto (openai: ${openAiClient.model})`],
+        ["renames", actualRenames.size],
+      ]);
     } else if (options.filenames) {
       // TODO - read precomputed filenames in and apply as needed
     }

@@ -160,7 +160,16 @@ export class OpenAIAssistant {
       vs = await this.openai.beta.vectorStores.create({
         file_ids: fileIds,
         name: vsId,
+        expires_after: {
+          anchor: "last_active_at",
+          days: 7,
+        },
       });
+    }
+
+    while (vs.status !== "completed") {
+      vs = await this.openai.beta.vectorStores.retrieve(vs.id);
+      await new Promise((res) => setTimeout(res, 5000));
     }
 
     return vs;
@@ -170,8 +179,13 @@ export class OpenAIAssistant {
     vs: OpenAI.Beta.VectorStore
   ): Promise<Record<string, string>> {
     const assistant = await this.getOrCreateAssistant();
+    // TODO requesting everything all at once doesn't work for larger debundles as we'll exceed the token limit - need to do some batching
+    // e.g. ask for first n files in one message iteratively - can do a loose toplogical sort to work out a good order to req. file names in
+    //      and engineer the prompt to ensure the assistant remembers the file names it's already assigned thanks to large context window
+    //      - we'll also need to deal with rate limiting here so need expo backoff
     const run = await this.openai.beta.threads.createAndRunPoll({
       assistant_id: assistant.id,
+      // TODO re-engineer prompt to deal with batched approach
       instructions: prompts.renamePrompt,
       tool_resources: {
         file_search: {
@@ -183,7 +197,11 @@ export class OpenAIAssistant {
     });
 
     if (run.status !== "completed") {
-      throw new Error("Failed to create assistant run for file renames.");
+      throw new Error(
+        `Failed to create assistant run for file renames (${
+          run.status
+        }):\n${JSON.stringify(run.last_error, undefined, 2)}`
+      );
     }
 
     const messages = await this.openai.beta.threads.messages.list(

@@ -94,6 +94,14 @@ describe("Webpack", () => {
     const newAsts = originalModules.map((a) => structuredClone(a.ast));
     expect(newAsts).not.toStrictEqual(originalAsts);
   });
+
+  test("immutable chunks shouldn't be able to be renamed", () => {
+    const deb = debundle({}, "js");
+    const chunk = deb.addChunk("name.js", "", true);
+    const originalName = chunk.name;
+    deb.updateNames({ [originalName]: "newname.js" });
+    expect(chunk.name).toBe(originalName);
+  });
 });
 
 // TODO add tests for auto-renaming
