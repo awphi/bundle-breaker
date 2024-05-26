@@ -40,15 +40,10 @@
   },
   "devDependencies": {
     "@types/babel__generator": "^7.6.8",
-    "@types/babel__traverse": "^7.20.5",
+    "@types/babel__traverse": "^7.20.6",
     "@types/hash-sum": "^1.0.2",
     "@types/node": "20.11.0",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
-  },
-  "pnpm": {
-    "patchedDependencies": {
-      "@types/babel__traverse@7.20.5": "patches/@types__babel__traverse@7.20.5.patch"
-    }
   }
 }

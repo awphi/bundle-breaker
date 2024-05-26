@@ -80,11 +80,12 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
 });
 
 describe("Webpack", () => {
+  const webpack4Simple = readBundle(
+    path.join(resolveExample("webpack4/simple"), "out")
+  );
+
   test("renaming files modifies ASTs", () => {
-    const files = readBundle(
-      path.join(resolveExample("webpack4/simple"), "out")
-    );
-    const deb = debundle(files, "js");
+    const deb = debundle(webpack4Simple, "js");
     const originalModules = [...deb.allModules()];
     const originalAsts = originalModules.map((a) => structuredClone(a.ast));
     const renames: Record<string, string> = Object.fromEntries(
@@ -96,7 +97,7 @@ describe("Webpack", () => {
   });
 
   test("immutable chunks shouldn't be able to be renamed", () => {
-    const deb = debundle({}, "js");
+    const deb = debundle(webpack4Simple, "js");
     const chunk = deb.addChunk("name.js", "", true);
     const originalName = chunk.name;
     deb.updateNames({ [originalName]: "newname.js" });
