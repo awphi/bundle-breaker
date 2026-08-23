@@ -1,47 +1,23 @@
 import { Command } from "commander";
 import path from "path";
-import fs from "fs";
+import fs from "fs/promises";
 import { spawn } from "child_process";
 
-type CommandDefinition = {
-  command: string;
-  args: string[];
-  env: NodeJS.ProcessEnv;
-};
+const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
 
 function resolveExample(example: string): string {
   return path.resolve(import.meta.dirname, "..", "examples", example);
 }
 
-function getBuildCommand(exampleName: string): CommandDefinition {
-  const env = { ...process.env };
-  const match = exampleName.match(/^webpack(\d+)/);
-  if (!match) {
-    throw new Error(`Unsupported example type '${exampleName}'.`);
-  }
-
-  if (match[1] === "4") {
-    env.NODE_OPTIONS = "--openssl-legacy-provider";
-  }
-
-  return {
-    command: process.platform === "win32" ? "npx.cmd" : "npx",
-    args: ["webpack", "-c", "./webpack.config.js"],
-    env,
-  };
-}
-
 async function buildExample(dir: string, silent: boolean): Promise<void> {
-  if (!fs.existsSync(dir) || !fs.lstatSync(dir).isDirectory()) {
+  if (!(await fs.lstat(dir)).isDirectory()) {
     throw new Error(`Example at '${dir}' is not a directory.`);
   }
 
-  const { command, args, env } = getBuildCommand(path.basename(dir));
-
   return new Promise((res, rej) => {
-    const proc = spawn(command, args, {
+    const proc = spawn(NPX_COMMAND, ["webpack", "-c", "./webpack.config.js"], {
       cwd: dir,
-      env,
+      env: { ...process.env },
     });
 
     proc.stderr.on("data", (err) => console.error(err.toString("utf-8")));
@@ -87,15 +63,14 @@ program
     const fail: string[] = [];
     const success: string[] = [];
 
-    for (const name of fs.readdirSync(examplesRoot)) {
+    const entries = await fs.readdir(examplesRoot);
+    for (const name of entries) {
       const ex = resolveExample(name);
-      if (name !== "node_modules" && fs.lstatSync(ex).isDirectory()) {
-        promises.push(
-          buildExample(ex, true)
-            .then(() => success.push(ex))
-            .catch(() => fail.push(ex))
-        );
-      }
+      promises.push(
+        buildExample(ex, true)
+          .then(() => success.push(ex))
+          .catch(() => fail.push(ex))
+      );
     }
 
     console.log(`Building ${promises.length} example(s)...`);

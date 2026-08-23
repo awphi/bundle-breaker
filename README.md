@@ -154,10 +154,10 @@ If you find a config that doesn't work as you'd expect and the relevant option(s
    pnpm examples:build-all
    ```
 
-   _Alternatively_, to re-build individual examples (e.g. `webpack4_x-simple`):
+   _Alternatively_, to re-build individual examples (e.g. `webpack4_47-simple`):
 
    ```sh
-   pnpm examples:build webpack4_x-simple
+   pnpm examples:build webpack4_47-simple
    ```
 
 4. Start the local dev build with:
@@ -169,5 +169,5 @@ If you find a config that doesn't work as you'd expect and the relevant option(s
 5. Test everything is working with a simple debundle by running:
 
    ```sh
-   npx . examples/webpack4_x-simple/out out
+   npx . examples/webpack4_47-simple/out out
    ```

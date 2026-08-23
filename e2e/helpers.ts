@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { getExampleWebpackMajor } from "../scripts/example-utils";
 
 const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 
@@ -8,19 +9,25 @@ export function resolveExample(ex: string): string {
 }
 
 // examples/ is flat - each example is its own self-contained, version-pinned
-// package named e.g. `webpack5_x-splitchunks` or `webpack5_104-terser`. Pass a
-// prefix (e.g. "webpack4", "webpack5") to only list examples for that bundler.
-export function listExamples(prefix?: string): string[] {
+// package, e.g. `webpack5_109-splitchunks` or `webpack5_91-terser`. Pass a
+// webpack major version (e.g. 4, 5) to only list examples pinned to that
+// major - determined by reading each example's own package.json rather than
+// its directory name, since the name is just a human-facing label.
+export function listExamples(webpackMajor?: number): string[] {
   const dir = resolveExample(".");
   const result: string[] = [];
   for (const name of fs.readdirSync(dir)) {
-    if (name === "node_modules" || (prefix && !name.startsWith(prefix))) {
+    if (name === "node_modules") {
       continue;
     }
     const ex = resolveExample(name);
-    if (fs.lstatSync(ex).isDirectory()) {
-      result.push(ex);
+    if (!fs.lstatSync(ex).isDirectory()) {
+      continue;
     }
+    if (webpackMajor !== undefined && getExampleWebpackMajor(ex) !== webpackMajor) {
+      continue;
+    }
+    result.push(ex);
   }
 
   return result;

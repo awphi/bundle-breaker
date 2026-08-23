@@ -1,5 +1,5 @@
 {
-  "name": "@bundle-breaker/webpack5_x-splitchunks",
+  "name": "@bundle-breaker/webpack5_109-simple-no-iife",
   "private": true,
   "devDependencies": {
     "is-even": "^1.0.0",

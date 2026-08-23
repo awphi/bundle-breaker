@@ -1,10 +1,11 @@
 {
-  "name": "@bundle-breaker/webpack4_x-simple",
+  "name": "@bundle-breaker/webpack4_47-terser",
   "private": true,
   "devDependencies": {
     "is-even": "^1.0.0",
     "babel-loader": "^8.0.5",
     "clean-webpack-plugin": "^4.0.0",
+    "terser-webpack-plugin": "4.2.3",
     "webpack": "4.47.0",
     "webpack-cli": "4.10.0"
   }

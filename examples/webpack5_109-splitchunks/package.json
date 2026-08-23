@@ -1,11 +1,10 @@
 {
-  "name": "@bundle-breaker/webpack5_104-terser",
+  "name": "@bundle-breaker/webpack5_109-splitchunks",
   "private": true,
   "devDependencies": {
     "is-even": "^1.0.0",
     "babel-loader": "^8.0.5",
-    "terser-webpack-plugin": "5.6.1",
-    "webpack": "5.104.0",
+    "webpack": "5.109.2",
     "webpack-cli": "5.1.4"
   }
 }

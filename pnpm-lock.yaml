@@ -52,7 +52,7 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@24.11.1)(vite@8.2.2(@types/node@24.11.1)(terser@5.50.0))
 
-  examples/webpack4_x-simple:
+  examples/webpack4_47-simple:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -70,7 +70,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack4_x-splitchunks:
+  examples/webpack4_47-splitchunks:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -88,7 +88,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack4_x-splitchunks-hashed-ids:
+  examples/webpack4_47-splitchunks-hashed-ids:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -106,7 +106,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack4_x-terser:
+  examples/webpack4_47-terser:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -127,43 +127,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack5_104-terser:
-    devDependencies:
-      babel-loader:
-        specifier: ^8.0.5
-        version: 8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.104.0)
-      is-even:
-        specifier: ^1.0.0
-        version: 1.0.0
-      terser-webpack-plugin:
-        specifier: 5.6.1
-        version: 5.6.1(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.104.0)
-      webpack:
-        specifier: 5.104.0
-        version: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-      webpack-cli:
-        specifier: 5.1.4
-        version: 5.1.4(webpack@5.104.0)
-
-  examples/webpack5_91-terser:
-    devDependencies:
-      babel-loader:
-        specifier: ^8.0.5
-        version: 8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.91.0)
-      is-even:
-        specifier: ^1.0.0
-        version: 1.0.0
-      terser-webpack-plugin:
-        specifier: 5.6.1
-        version: 5.6.1(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.91.0)
-      webpack:
-        specifier: 5.91.0
-        version: 5.91.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-      webpack-cli:
-        specifier: 5.1.4
-        version: 5.1.4(webpack@5.91.0)
-
-  examples/webpack5_x-complex:
+  examples/webpack5_109-complex:
     devDependencies:
       '@babel/preset-env':
         specifier: ^7.24.5
@@ -217,7 +181,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_x-simple-iife:
+  examples/webpack5_109-simple-iife:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -232,7 +196,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_x-simple-no-iife:
+  examples/webpack5_109-simple-no-iife:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -247,7 +211,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_x-splitchunks:
+  examples/webpack5_109-splitchunks:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -262,7 +226,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_x-splitchunks-hashed-ids:
+  examples/webpack5_109-splitchunks-hashed-ids:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -276,6 +240,24 @@ importers:
       webpack-cli:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
+
+  examples/webpack5_91-terser:
+    devDependencies:
+      babel-loader:
+        specifier: ^8.0.5
+        version: 8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.91.0)
+      is-even:
+        specifier: ^1.0.0
+        version: 1.0.0
+      terser-webpack-plugin:
+        specifier: 5.6.1
+        version: 5.6.1(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.91.0)
+      webpack:
+        specifier: 5.91.0
+        version: 5.91.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
+      webpack-cli:
+        specifier: 5.1.4
+        version: 5.1.4(webpack@5.91.0)
 
 packages:
 
@@ -1578,12 +1560,6 @@ packages:
     deprecated: package has been renamed to acorn-import-attributes
     peerDependencies:
       acorn: ^8
-
-  acorn-import-phases@1.0.4:
-    resolution: {integrity: sha512-wKmbr/DDiIXzEOiWrTTUcDm24kQ2vGfZQvM2fwg2vXqR5uW6aapr7ObPtj1th32b9u90/Pf4AItvdTh42fBmVQ==}
-    engines: {node: '>=10.13.0'}
-    peerDependencies:
-      acorn: ^8.14.0
 
   acorn@6.4.2:
     resolution: {integrity: sha512-XtGIhXwF8YM8bJhGxG5kXgjkEuNGLTkoYqVE+KMR+aspr4KGYmKYg7yUe3KghyQ9yheNwLnjmzh/7+gfDBmHCQ==}
@@ -4058,16 +4034,6 @@ packages:
       webpack-command:
         optional: true
 
-  webpack@5.104.0:
-    resolution: {integrity: sha512-5DeICTX8BVgNp6afSPYXAFjskIgWGlygQH58bcozPOXgo2r/6xx39Y1+cULZ3gTxUYQP88jmwLj2anu4Xaq84g==}
-    engines: {node: '>=10.13.0'}
-    hasBin: true
-    peerDependencies:
-      webpack-cli: '*'
-    peerDependenciesMeta:
-      webpack-cli:
-        optional: true
-
   webpack@5.109.2:
     resolution: {integrity: sha512-U9/cvLzxObKNEZ9+TtdqrHM5/9z3lgl2c+c4BzbqGxFQvQvBAq87yql5A8pQ+rrMbS496MZJeF5enVBndIy2hw==}
     engines: {node: '>=10.13.0'}
@@ -5335,11 +5301,6 @@ snapshots:
       webpack: 4.47.0(supports-color@8.1.1)(webpack-cli@4.10.0)
       webpack-cli: 4.10.0(webpack@4.47.0)
 
-  '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4)(webpack@5.104.0)':
-    dependencies:
-      webpack: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-      webpack-cli: 5.1.4(webpack@5.104.0)
-
   '@webpack-cli/configtest@2.1.1(webpack-cli@5.1.4)(webpack@5.109.2)':
     dependencies:
       webpack: 5.109.2(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
@@ -5355,11 +5316,6 @@ snapshots:
       envinfo: 7.21.0
       webpack-cli: 4.10.0(webpack@4.47.0)
 
-  '@webpack-cli/info@2.0.2(webpack-cli@5.1.4)(webpack@5.104.0)':
-    dependencies:
-      webpack: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-      webpack-cli: 5.1.4(webpack@5.104.0)
-
   '@webpack-cli/info@2.0.2(webpack-cli@5.1.4)(webpack@5.109.2)':
     dependencies:
       webpack: 5.109.2(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
@@ -5373,11 +5329,6 @@ snapshots:
   '@webpack-cli/serve@1.7.0(webpack-cli@4.10.0)':
     dependencies:
       webpack-cli: 4.10.0(webpack@4.47.0)
-
-  '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4)(webpack@5.104.0)':
-    dependencies:
-      webpack: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-      webpack-cli: 5.1.4(webpack@5.104.0)
 
   '@webpack-cli/serve@2.0.5(webpack-cli@5.1.4)(webpack@5.109.2)':
     dependencies:
@@ -5470,10 +5421,6 @@ snapshots:
   '@yuku-toolchain/types@0.8.7': {}
 
   acorn-import-assertions@1.9.0(acorn@8.18.0):
-    dependencies:
-      acorn: 8.18.0
-
-  acorn-import-phases@1.0.4(acorn@8.18.0):
     dependencies:
       acorn: 8.18.0
 
@@ -5594,15 +5541,6 @@ snapshots:
       make-dir: 3.1.0
       schema-utils: 2.7.1
       webpack: 4.47.0(supports-color@8.1.1)(webpack-cli@4.10.0)
-
-  babel-loader@8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.104.0):
-    dependencies:
-      '@babel/core': 7.29.7(supports-color@8.1.1)
-      find-cache-dir: 3.3.2
-      loader-utils: 2.0.4
-      make-dir: 3.1.0
-      schema-utils: 2.7.1
-      webpack: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
 
   babel-loader@8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.109.2):
     dependencies:
@@ -7772,20 +7710,6 @@ snapshots:
     transitivePeerDependencies:
       - bluebird
 
-  terser-webpack-plugin@5.6.1(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.104.0):
-    dependencies:
-      '@jridgewell/trace-mapping': 0.3.31
-      jest-worker: 27.5.1
-      schema-utils: 4.3.3
-      terser: 5.50.0
-      webpack: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-    optionalDependencies:
-      clean-css: 5.3.3
-      esbuild: 0.21.5
-      html-minifier-terser: 6.1.0
-      lightningcss: 1.33.0
-      postcss: 8.5.26
-
   terser-webpack-plugin@5.6.1(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.109.2):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -8096,23 +8020,6 @@ snapshots:
       webpack: 4.47.0(supports-color@8.1.1)(webpack-cli@4.10.0)
       webpack-merge: 5.10.0
 
-  webpack-cli@5.1.4(webpack@5.104.0):
-    dependencies:
-      '@discoveryjs/json-ext': 0.5.7
-      '@webpack-cli/configtest': 2.1.1(webpack-cli@5.1.4)(webpack@5.104.0)
-      '@webpack-cli/info': 2.0.2(webpack-cli@5.1.4)(webpack@5.104.0)
-      '@webpack-cli/serve': 2.0.5(webpack-cli@5.1.4)(webpack@5.104.0)
-      colorette: 2.0.20
-      commander: 10.0.1
-      cross-spawn: 7.0.6
-      envinfo: 7.21.0
-      fastest-levenshtein: 1.0.16
-      import-local: 3.2.0
-      interpret: 3.1.1
-      rechoir: 0.8.0
-      webpack: 5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
-      webpack-merge: 5.10.0
-
   webpack-cli@5.1.4(webpack@5.109.2):
     dependencies:
       '@discoveryjs/json-ext': 0.5.7
@@ -8189,49 +8096,6 @@ snapshots:
       webpack-cli: 4.10.0(webpack@4.47.0)
     transitivePeerDependencies:
       - supports-color
-
-  webpack@5.104.0(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4):
-    dependencies:
-      '@types/eslint-scope': 3.7.7
-      '@types/estree': 1.0.9
-      '@types/json-schema': 7.0.15
-      '@webassemblyjs/ast': 1.14.1
-      '@webassemblyjs/wasm-edit': 1.14.1
-      '@webassemblyjs/wasm-parser': 1.14.1
-      acorn: 8.18.0
-      acorn-import-phases: 1.0.4(acorn@8.18.0)
-      browserslist: 4.28.8
-      chrome-trace-event: 1.0.4
-      enhanced-resolve: 5.24.5
-      es-module-lexer: 2.3.2
-      eslint-scope: 5.1.1
-      events: 3.3.0
-      glob-to-regexp: 0.4.1
-      graceful-fs: 4.2.11
-      json-parse-even-better-errors: 2.3.1
-      loader-runner: 4.3.2
-      mime-types: 2.1.35
-      neo-async: 2.6.2
-      schema-utils: 4.3.3
-      tapable: 2.3.3
-      terser-webpack-plugin: 5.6.1(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack@5.104.0)
-      watchpack: 2.5.2
-      webpack-sources: 3.5.1
-    optionalDependencies:
-      webpack-cli: 5.1.4(webpack@5.104.0)
-    transitivePeerDependencies:
-      - '@minify-html/node'
-      - '@swc/core'
-      - '@swc/css'
-      - '@swc/html'
-      - clean-css
-      - cssnano
-      - csso
-      - esbuild
-      - html-minifier-terser
-      - lightningcss
-      - postcss
-      - uglify-js
 
   webpack@5.109.2(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4):
     dependencies:

@@ -4,8 +4,8 @@ import { listExamples, readBundle, resolveExample } from "./helpers";
 import path from "path";
 import mockChunk from "./mock-chunk.json";
 
-describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
-  const examples = listExamples(bundler).map((a) => path.join(a, "out"));
+describe.each([4, 5])("Debundle webpack%s", (bundlerMajor) => {
+  const examples = listExamples(bundlerMajor).map((a) => path.join(a, "out"));
   describe.each(examples)(`%s`, (dir) => {
     const files = readBundle(dir);
     let deb: Debundle;
@@ -81,7 +81,7 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
 
 describe("Webpack", () => {
   const webpack4Simple = readBundle(
-    path.join(resolveExample("webpack4_x-simple"), "out")
+    path.join(resolveExample("webpack4_47-simple"), "out")
   );
 
   test("renaming files modifies ASTs", () => {

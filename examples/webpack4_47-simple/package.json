@@ -1,5 +1,5 @@
 {
-  "name": "@bundle-breaker/webpack4_x-splitchunks-hashed-ids",
+  "name": "@bundle-breaker/webpack4_47-simple",
   "private": true,
   "devDependencies": {
     "is-even": "^1.0.0",

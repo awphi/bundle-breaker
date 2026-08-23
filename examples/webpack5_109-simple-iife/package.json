@@ -1,5 +1,5 @@
 {
-  "name": "@bundle-breaker/webpack5_x-simple-no-iife",
+  "name": "@bundle-breaker/webpack5_109-simple-iife",
   "private": true,
   "devDependencies": {
     "is-even": "^1.0.0",
