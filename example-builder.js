@@ -7,6 +7,8 @@ function resolveExample(ex) {
   return path.resolve(__dirname, "examples", ex);
 }
 
+// TODO can we replace this with pnpm workspace commands?
+
 function getBuildCommand(type) {
   const env = { ...process.env };
   if (type.startsWith("webpack")) {

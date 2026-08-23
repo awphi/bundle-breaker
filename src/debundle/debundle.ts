@@ -1,9 +1,15 @@
 import * as parser from "@babel/parser";
 import generate from "@babel/generator";
-import { Chunk, DeobfsucateOpts, Module, Mutable, NamedAST } from "../types";
+import type {
+  Chunk,
+  DeobfsucateOpts,
+  Module,
+  Mutable,
+  NamedAST,
+} from "../types";
 import { DEFAULT_DEOB_OPTS, MODULES_DIR, cyrb64Hash } from "../utils";
 import { DirectedGraph } from "graphology";
-import traverse, { Visitor } from "@babel/traverse";
+import traverse, { type Visitor } from "@babel/traverse";
 import * as deobfuscate from "../visitor/deobfuscate";
 import * as t from "@babel/types";
 import path from "path/posix";
@@ -142,7 +148,7 @@ export abstract class Debundle {
     return changedNames;
   }
 
-  protected updateNamesInternal(_renames: Map<string, string>) {}
+  protected updateNamesInternal(_renames: Map<string, string>): void {}
 
   private formatModuleOrChunkName(name: string): string {
     const extLength = path.extname(name).length;
@@ -163,15 +169,15 @@ export abstract class Debundle {
     return this.moduleGraph !== undefined;
   }
 
-  *allModules() {
+  *allModules(): MapIterator<Readonly<Module>> {
     yield* this.modules.values();
   }
 
-  *allChunks() {
+  *allChunks(): MapIterator<Readonly<Chunk>> {
     yield* this.chunks.values();
   }
 
-  *allModulesAllChunks() {
+  *allModulesAllChunks(): Generator<Readonly<Module | Chunk>> {
     yield* this.allModules();
     yield* this.allChunks();
   }

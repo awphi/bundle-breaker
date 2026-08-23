@@ -1,6 +1,7 @@
 # Features
 
 - [ ] Major refactor of internals - easier to follow etc
+- [ ] Re-thinking testing strategy (related to above) - examples power e2e, level level unit tests for internals
 - [ ] API update - think about a cleaner, deeper interface
 - [ ] Group: Graph clustering on the module graph + group modules into directories
 - [ ] Prune: Add module graph pruning to cherrypick certain module(s) and their transitive deps

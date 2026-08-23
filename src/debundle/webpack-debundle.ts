@@ -1,7 +1,7 @@
 import * as t from "@babel/types";
 import traverse, { NodePath } from "@babel/traverse";
 import { Debundle } from "./debundle";
-import { Chunk, Module, NamedAST } from "../types";
+import type { Chunk, Module, NamedAST } from "../types";
 import { DirectedGraph } from "graphology";
 
 import {
@@ -387,7 +387,7 @@ export class WebpackDebundle extends Debundle {
     return graph;
   }
 
-  protected updateNamesInternal(renames: Map<string, string>) {
+  protected updateNamesInternal(renames: Map<string, string>): void {
     this.forEachWebpackRequireFnCall((_, path) => {
       const arg = path.get("arguments")[0];
       const newName = renames.get(arg.node.value.toString());

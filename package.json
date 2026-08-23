@@ -2,9 +2,9 @@
   "name": "bundle-breaker",
   "version": "0.1.0",
   "description": "CLI & library to reverse-engineer bundled/obfuscated JS applications.",
-  "main": "dist/index.js",
-  "bin": "dist/cli.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/index.mjs",
+  "bin": "dist/cli.mjs",
+  "types": "dist/index.d.mts",
   "packageManager": "pnpm@11.23.0",
   "files": [
     "dist/"
@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "pnpm build --watch",
     "prepack": "pnpm build",
-    "build": "tsc",
+    "build": "tsdown",
     "test": "vitest",
     "examples:build-all": "node example-builder.js build-all",
     "examples:build": "node example-builder.js build"
@@ -34,15 +34,14 @@
     "commander": "^12.0.0",
     "graphology": "^0.25.4",
     "graphology-gexf": "^0.13.0",
-    "picocolors": "^1.0.1",
-    "tslib": "^2.6.2"
+    "picocolors": "^1.0.1"
   },
   "devDependencies": {
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.6",
-    "@types/hash-sum": "^1.0.2",
-    "@types/node": "20.11.0",
-    "typescript": "^5.4.5",
-    "vitest": "^1.6.0"
+    "@types/node": "24.11.1",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

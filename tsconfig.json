@@ -1,14 +1,21 @@
 {
   "compilerOptions": {
-    "module": "Node16",
-    "target": "ESNext",
-    "moduleResolution": "Node16",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "declaration": true,
+    "isolatedDeclarations": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "esModuleInterop": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "outDir": "dist",
-    "importHelpers": true,
-    "declaration": true
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "types": ["node"],
+    "skipLibCheck": true
   },
-  "include": ["src/**/*"],
-  "exclude": []
+  "include": ["src"]
 }
