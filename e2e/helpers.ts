@@ -7,14 +7,19 @@ export function resolveExample(ex: string): string {
   return path.resolve(import.meta.dirname, "..", "examples", ex);
 }
 
-export function listExamples(...dirs: string[]): string[] {
+// examples/ is flat - each example is its own self-contained, version-pinned
+// package named e.g. `webpack5_x-splitchunks` or `webpack5_104-terser`. Pass a
+// prefix (e.g. "webpack4", "webpack5") to only list examples for that bundler.
+export function listExamples(prefix?: string): string[] {
+  const dir = resolveExample(".");
   const result: string[] = [];
-  for (const dir of dirs.map(resolveExample)) {
-    for (const name of fs.readdirSync(dir)) {
-      const ex = resolveExample(path.join(dir, name));
-      if (name !== "node_modules" && fs.lstatSync(ex).isDirectory()) {
-        result.push(ex);
-      }
+  for (const name of fs.readdirSync(dir)) {
+    if (name === "node_modules" || (prefix && !name.startsWith(prefix))) {
+      continue;
+    }
+    const ex = resolveExample(name);
+    if (fs.lstatSync(ex).isDirectory()) {
+      result.push(ex);
     }
   }
 

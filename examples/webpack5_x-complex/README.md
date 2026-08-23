@@ -1,4 +1,4 @@
-# webpack5/complex
+# webpack5_x-complex
 
 This is a simple dummy app that acts as a useful benchmark for the real-world performance of `bundle-breaker`. This web app aims to mimic common aspects of webpack-bundled production web applications like:
 

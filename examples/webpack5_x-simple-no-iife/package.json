@@ -1,0 +1,10 @@
+{
+  "name": "@bundle-breaker/webpack5_x-simple-no-iife",
+  "private": true,
+  "devDependencies": {
+    "is-even": "^1.0.0",
+    "babel-loader": "^8.0.5",
+    "webpack": "5.109.2",
+    "webpack-cli": "5.1.4"
+  }
+}

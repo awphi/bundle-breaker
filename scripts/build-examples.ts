@@ -13,21 +13,22 @@ function resolveExample(example: string): string {
   return path.resolve(import.meta.dirname, "..", "examples", example);
 }
 
-function getBuildCommand(type: string): CommandDefinition {
+function getBuildCommand(exampleName: string): CommandDefinition {
   const env = { ...process.env };
-  if (type.startsWith("webpack")) {
-    if (type === "webpack4") {
-      env.NODE_OPTIONS = "--openssl-legacy-provider";
-    }
-
-    return {
-      command: process.platform === "win32" ? "npx.cmd" : "npx",
-      args: ["webpack", "-c", "./webpack.config.js"],
-      env,
-    };
-  } else {
-    throw new Error(`Unsupported example type '${type}'.`);
+  const match = exampleName.match(/^webpack(\d+)/);
+  if (!match) {
+    throw new Error(`Unsupported example type '${exampleName}'.`);
   }
+
+  if (match[1] === "4") {
+    env.NODE_OPTIONS = "--openssl-legacy-provider";
+  }
+
+  return {
+    command: process.platform === "win32" ? "npx.cmd" : "npx",
+    args: ["webpack", "-c", "./webpack.config.js"],
+    env,
+  };
 }
 
 async function buildExample(dir: string, silent: boolean): Promise<void> {
@@ -35,8 +36,7 @@ async function buildExample(dir: string, silent: boolean): Promise<void> {
     throw new Error(`Example at '${dir}' is not a directory.`);
   }
 
-  const type = path.basename(path.dirname(dir));
-  const { command, args, env } = getBuildCommand(type);
+  const { command, args, env } = getBuildCommand(path.basename(dir));
 
   return new Promise((res, rej) => {
     const proc = spawn(command, args, {
@@ -82,21 +82,19 @@ program
   .command("build-all")
   .description("Build all examples")
   .action(async () => {
-    const exampleDirs = ["webpack4", "webpack5"];
+    const examplesRoot = resolveExample(".");
     const promises = [];
     const fail: string[] = [];
     const success: string[] = [];
 
-    for (const dir of exampleDirs.map(resolveExample)) {
-      for (const name of fs.readdirSync(dir)) {
-        const ex = resolveExample(path.join(dir, name));
-        if (name !== "node_modules" && fs.lstatSync(ex).isDirectory()) {
-          promises.push(
-            buildExample(ex, true)
-              .then(() => success.push(ex))
-              .catch(() => fail.push(ex))
-          );
-        }
+    for (const name of fs.readdirSync(examplesRoot)) {
+      const ex = resolveExample(name);
+      if (name !== "node_modules" && fs.lstatSync(ex).isDirectory()) {
+        promises.push(
+          buildExample(ex, true)
+            .then(() => success.push(ex))
+            .catch(() => fail.push(ex))
+        );
       }
     }
 

@@ -81,7 +81,7 @@ describe.each(["webpack4", "webpack5"])("Debundle %s", (bundler) => {
 
 describe("Webpack", () => {
   const webpack4Simple = readBundle(
-    path.join(resolveExample("webpack4/simple"), "out")
+    path.join(resolveExample("webpack4_x-simple"), "out")
   );
 
   test("renaming files modifies ASTs", () => {
