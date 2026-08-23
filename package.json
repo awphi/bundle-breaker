@@ -1,11 +1,11 @@
 {
   "name": "bundle-breaker",
   "version": "0.1.0",
-  "description": "Utilities to reverse-engineer bundled/obfuscated JS applications.",
+  "description": "CLI & library to reverse-engineer bundled/obfuscated JS applications.",
   "main": "dist/index.js",
   "bin": "dist/cli.js",
   "types": "dist/index.d.ts",
-  "packageManager": "pnpm@8.15.4",
+  "packageManager": "pnpm@11.23.0",
   "files": [
     "dist/"
   ],
