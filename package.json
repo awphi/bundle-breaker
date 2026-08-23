@@ -21,7 +21,7 @@
     "dev": "pnpm build --watch",
     "prepack": "pnpm build",
     "build": "tsdown",
-    "test": "vitest",
+    "test": "vitest run",
     "examples:build-all": "node ./scripts/build-examples.ts build-all",
     "examples:build": "node ./scripts/build-examples.ts build"
   },

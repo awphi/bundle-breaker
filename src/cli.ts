@@ -11,11 +11,9 @@ import {
 } from "./cli-utils";
 import { DEFAULT_DEOB_OPTS } from "./utils";
 import pc from "picocolors";
+import { version, description, name } from "../package.json";
 
 const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
-// use require() to prevent tsc copying package.json into the dist/ folder when building
-const { version, description, name } = require("../package.json");
-
 const productName = pc.bold(name);
 
 program

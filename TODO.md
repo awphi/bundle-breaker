@@ -1,8 +1,12 @@
-# Features
+# Resurrection
 
 - [ ] Major refactor of internals - easier to follow etc
 - [ ] Re-thinking testing strategy (related to above) - examples power e2e, level level unit tests for internals
 - [ ] API update - think about a cleaner, deeper interface
+- [ ] New e2e testing strategy - wp5.92 and wp5.104 broke the existing traversals, need a better way of testing many wp versions
+
+# Features
+
 - [ ] Group: Graph clustering on the module graph + group modules into directories
 - [ ] Prune: Add module graph pruning to cherrypick certain module(s) and their transitive deps
 - [ ] AI-renames: Re-add but provider agnostic w/ neater API
