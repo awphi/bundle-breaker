@@ -114,38 +114,9 @@ const deb = debundle(files);
 deb.updateNames(fileRenames);
 ```
 
-### Automatic Naming
+### LLM file name inference
 
-However, since source file names are usually lost in the bundling/minification process, `bundle-breaker` also supports automatic file renaming. This is powered by OpenAI's large language models. This allows us to easily automate the tedious process of inferring the purpose of code - even with minimal deobfuscation. Thanks to the sheer size of these models, this achieves a very solid level of accuracy.
-
-**CLI:**
-
-```sh
-OPENAI_API_KEY=foobar npx bundle-breaker -c -f auto path/to/bundle ./out
-```
-
-To use automatic file renaming via the CLI you must ensure you have set the `OPENAI_API_KEY` environment variable. You could choose to do this via something like [dotenv](https://www.npmjs.com/package/dotenv) or [.env support in Node v20.6+](https://nodejs.org/en/blog/release/v20.6.0#built-in-env-file-support) if you so wish.
-
-```javascript
-import { debundle, OpenAIAssistant } from "bundle-breaker";
-
-const openAiApiKey = "foobar";
-const files = { "index.js": "...", "chunk.js": "..." };
-const deb = debundle(files);
-// create the API client with our key. this will default to process.env.OPENAI_API_KEY if omitted.
-const openAiClient = new OpenAIAssistant(openAiApiKey);
-// create a vector store containing all our debundle's files
-const vs = await openAiClient.getOrCreateVectorStore(deb);
-const renames = await openAiClient.computeFileRenames(vs);
-// ... we chould choose to save these computed renames to the disk for future use without needing the API again ...
-deb.updateNames(renames);
-```
-
-The `OpenAIAssistant` utility class is responsible for provisioning and managing all resources on the OpenAI servers via their API. It aims to produce minimal clutter. For example, `bundle-breaker` will only create one [assistant](https://platform.openai.com/docs/api-reference/assistants) per model you choose to use. It will also use the unique identifier of each debundle and its constituent files (which are calculated via hashing their ASTs) to avoid creating duplicate resources under your project.
-
-In general, it would be good practice to create a unique project on the OpenAI dashboard for each reverse-engineering project you work on to keep everything separate and make clean-up easy.
-
-> **Note**: Usage of automatic file renaming requires sending your debundled code to OpenAI's API. This means it should be avoided unless you have express permission of the original application's owner.
+TODO
 
 ## Group
 

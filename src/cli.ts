@@ -11,7 +11,6 @@ import {
 } from "./cli-utils";
 import { DEFAULT_DEOB_OPTS } from "./utils";
 import pc from "picocolors";
-import { OpenAIAssistant } from "./openai/client";
 
 const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 // use require() to prevent tsc copying package.json into the dist/ folder when building
@@ -117,21 +116,7 @@ program
       ]);
     }
 
-    if (options.filenames === "auto") {
-      const openAiClient = new OpenAIAssistant();
-      const vs = await openAiClient.getOrCreateVectorStore(deb);
-      logTask("obtained openai vector store", [
-        ["id", vs.id],
-        ["size", formatBytes(vs.usage_bytes)],
-        ["status", vs.status],
-      ]);
-      const renames = await openAiClient.computeFileRenames(vs);
-      const actualRenames = deb.updateNames(renames);
-      logTask("renamed", [
-        ["src", `auto (openai: ${openAiClient.model})`],
-        ["renames", actualRenames.size],
-      ]);
-    } else if (options.filenames) {
+    if (options.filenames) {
       // TODO - read precomputed filenames in and apply as needed
     }
 

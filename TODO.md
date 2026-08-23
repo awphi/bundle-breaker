@@ -1,7 +1,10 @@
 # Features
 
+- [ ] Major refactor of internals - easier to follow etc
+- [ ] API update - think about a cleaner, deeper interface
 - [ ] Group: Graph clustering on the module graph + group modules into directories
 - [ ] Prune: Add module graph pruning to cherrypick certain module(s) and their transitive deps
+- [ ] AI-renames: Re-add but provider agnostic w/ neater API
 - [ ] Support for parcel - it seems to hoist scope similar to rollup but give export unique source-file-based identifiers which we can exploit to plonk functions, classes, constants etc back in individual module files
 - [ ] Think about how we can at least partially support rollup
 
