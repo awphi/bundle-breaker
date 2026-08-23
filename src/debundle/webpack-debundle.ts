@@ -48,21 +48,37 @@ function makeModuleMap(expr?: t.Node): WebpackModuleMap {
   if (t.isObjectExpression(expr)) {
     result.moduleMapExpr = expr;
     for (const prop of expr.properties) {
-      if (
-        t.isProperty(prop) &&
-        t.isLiteral(prop.key) &&
-        (prop.key.type === "StringLiteral" ||
-          prop.key.type === "NumericLiteral") &&
-        isAnyFunctionExpression(prop.value)
-      ) {
-        result.moduleFns[prop.key.value.toString()] = prop.value;
+      if (!t.isObjectProperty(prop) && !t.isObjectMethod(prop)) {
+        continue;
+      }
+
+      const key = prop.key;
+
+      if (!t.isStringLiteral(key) && !t.isNumericLiteral(key)) {
+        continue;
+      }
+
+      const moduleId = key.value.toString();
+
+      if (t.isObjectProperty(prop) && isAnyFunctionExpression(prop.value)) {
+        result.moduleFns[moduleId] = prop.value;
+      } else if (t.isObjectMethod(prop) && prop.kind === "method") {
+        // recent webpack5 versions render module wrapper functions as ES6 shorthand
+        // methods (e.g. `207(module) {...}`) rather than `207: (module) => {...}` - normalize these
+        result.moduleFns[moduleId] = t.functionExpression(
+          null,
+          prop.params,
+          prop.body,
+          prop.generator,
+          prop.async
+        );
       }
     }
   } else if (t.isArrayExpression(expr)) {
     result.moduleMapExpr = expr;
     for (let i = 0; i < expr.elements.length; i++) {
       const fn = expr.elements[i];
-      if (isAnyFunctionExpression(fn)) {
+      if (fn && isAnyFunctionExpression(fn)) {
         result.moduleFns[i.toString()] = fn;
       }
     }
