@@ -1,15 +1,19 @@
-const { Command } = require("commander");
-const path = require("path");
-const fs = require("fs");
-const { spawn } = require("child_process");
+import { Command } from "commander";
+import path from "path";
+import fs from "fs";
+import { spawn } from "child_process";
 
-function resolveExample(ex) {
-  return path.resolve(__dirname, "examples", ex);
+type CommandDefinition = {
+  command: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+};
+
+function resolveExample(example: string): string {
+  return path.resolve(import.meta.dirname, "..", "examples", example);
 }
 
-// TODO can we replace this with pnpm workspace commands?
-
-function getBuildCommand(type) {
+function getBuildCommand(type: string): CommandDefinition {
   const env = { ...process.env };
   if (type.startsWith("webpack")) {
     if (type === "webpack4") {
@@ -26,7 +30,7 @@ function getBuildCommand(type) {
   }
 }
 
-async function buildExample(dir, silent) {
+async function buildExample(dir: string, silent: boolean): Promise<void> {
   if (!fs.existsSync(dir) || !fs.lstatSync(dir).isDirectory()) {
     throw new Error(`Example at '${dir}' is not a directory.`);
   }
@@ -80,8 +84,8 @@ program
   .action(async () => {
     const exampleDirs = ["webpack4", "webpack5"];
     const promises = [];
-    const fail = [];
-    const success = [];
+    const fail: string[] = [];
+    const success: string[] = [];
 
     for (const dir of exampleDirs.map(resolveExample)) {
       for (const name of fs.readdirSync(dir)) {

@@ -1,12 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 
 export function resolveExample(ex: string): string {
-  return path.resolve(__dirname, "..", "examples", ex);
+  return path.resolve(import.meta.dirname, "..", "examples", ex);
 }
 
 export function listExamples(...dirs: string[]): string[] {

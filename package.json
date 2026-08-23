@@ -6,6 +6,7 @@
   "bin": "dist/cli.mjs",
   "types": "dist/index.d.mts",
   "packageManager": "pnpm@11.23.0",
+  "type": "module",
   "files": [
     "dist/"
   ],
@@ -21,8 +22,8 @@
     "prepack": "pnpm build",
     "build": "tsdown",
     "test": "vitest",
-    "examples:build-all": "node example-builder.js build-all",
-    "examples:build": "node example-builder.js build"
+    "examples:build-all": "node ./scripts/build-examples.ts build-all",
+    "examples:build": "node ./scripts/build-examples.ts build"
   },
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",
