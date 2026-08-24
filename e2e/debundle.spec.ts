@@ -1,88 +1,98 @@
 import { expect, test, describe, beforeEach } from "vitest";
 import { debundle, Debundle, WebpackDebundle } from "bundle-breaker";
-import { listExamples, readBundle, resolveExample } from "./helpers";
+import fs from "fs";
 import path from "path";
 import mockChunk from "./mock-chunk.json";
 
-describe.each([4, 5])("Debundle webpack%s", (bundlerMajor) => {
-  const examples = listExamples(bundlerMajor).map((a) => path.join(a, "out"));
-  describe.each(examples)(`%s`, (dir) => {
-    const files = readBundle(dir);
-    let deb: Debundle;
-    beforeEach(() => {
-      deb = debundle(files, "js");
-    });
+const examplesDir = path.resolve(import.meta.dirname, "..", "examples");
+const jsFileExtensions = new Set([".js", ".cjs", ".mjs"]);
 
-    // checks if correct class was instantiated, the debundle has a valid ID and contains some modules/chunks
-    test("is basically valid", () => {
-      const id = deb.getId();
+function resolveExampleBundle(example: string): string {
+  return path.resolve(examplesDir, example, "out");
+}
 
-      expect(deb).toBeInstanceOf(WebpackDebundle);
-      expect([...deb.allModules()].length).toBeGreaterThan(0);
-      expect([...deb.allChunks()].length).toBeGreaterThan(0);
-      expect(id).toBeTypeOf("string");
-      expect(id.length).toBeGreaterThan(0);
-    });
+// simple example implementation of how a user may choose to read/filter their bundle files
+function readBundle(dir: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const content = fs.readdirSync(dir);
+  for (const file of content) {
+    if (jsFileExtensions.has(path.extname(file))) {
+      result[file] = fs.readFileSync(path.join(dir, file)).toString();
+    }
+  }
+  return result;
+}
 
-    test("can be deobfuscated", () => {
-      const { ast } = deb.addChunk(
-        "mock-chunk",
-        structuredClone(mockChunk) as any
-      );
-      expect(ast).toBeDefined();
-      deb.deobfuscate();
-      expect(ast).not.toMatchObject(mockChunk);
-    });
+describe.each(fs.readdirSync(examplesDir))("Debundle %s", (example) => {
+  const files = readBundle(resolveExampleBundle(example));
 
-    test("can be graphed", () => {
-      const graph = deb.graph();
-      expect(graph.order).toBeGreaterThan(0);
-      expect(graph.size).toBeGreaterThan(0);
-    });
+  // checks if correct class was instantiated, the debundle has a valid ID and contains some modules/chunks
+  test("is basically valid", () => {
+    const deb = debundle(files, "js");
+    const id = deb.getId();
 
-    test("files can be renamed", () => {
-      const originalFileNames = [...deb.allModulesAllChunks()].map(
-        (a) => a.name
-      );
-      const renames: Record<string, string> = Object.fromEntries(
-        originalFileNames.map((a, i) => [a, `newName_${i}`])
-      );
-      deb.updateNames(renames);
-      const newFileNames = [...deb.allModulesAllChunks()].map((a) => a.name);
-      console.log(originalFileNames, newFileNames);
-      expect(originalFileNames).not.toStrictEqual(newFileNames);
-      for (const newName of newFileNames) {
-        expect(newName).toMatch(
-          /^((modules\/)?newName_.*)|module_mapping\.js$/
-        );
-      }
-    });
+    expect(deb).toBeInstanceOf(WebpackDebundle);
+    expect([...deb.allModules()].length).toBeGreaterThan(0);
+    expect([...deb.allChunks()].length).toBeGreaterThan(0);
+    expect(id).toBeTypeOf("string");
+    expect(id.length).toBeGreaterThan(0);
+  });
 
-    test("module and chunk IDs are correctly formatted", () => {
-      deb = debundle(files, "cjs");
+  test("can be deobfuscated", () => {
+    const deb = debundle(files, "js");
+    const { ast } = deb.addChunk(
+      "mock-chunk",
+      structuredClone(mockChunk) as any
+    );
+    expect(ast).toBeDefined();
+    deb.deobfuscate();
+    expect(ast).not.toMatchObject(mockChunk);
+  });
 
-      // chunks should all be on the top-level dir
-      for (const file of deb.allChunks()) {
-        expect(file.name).not.toMatch(/\//);
-      }
+  test("can be graphed", () => {
+    const deb = debundle(files, "js");
+    const graph = deb.graph();
+    expect(graph.order).toBeGreaterThan(0);
+    expect(graph.size).toBeGreaterThan(0);
+  });
 
-      // modules should all live in the modules dir with a custom name
-      for (const file of deb.allModules()) {
-        expect(file.name).toMatch(/^modules.*/);
-      }
+  test("files can be renamed", () => {
+    const deb = debundle(files, "js");
+    const originalFileNames = [...deb.allModulesAllChunks()].map((a) => a.name);
+    const renames: Record<string, string> = Object.fromEntries(
+      originalFileNames.map((a, i) => [a, `newName_${i}`])
+    );
+    deb.updateNames(renames);
+    const newFileNames = [...deb.allModulesAllChunks()].map((a) => a.name);
+    console.log(originalFileNames, newFileNames);
+    expect(originalFileNames).not.toStrictEqual(newFileNames);
+    for (const newName of newFileNames) {
+      expect(newName).toMatch(/^((modules\/)?newName_.*)|module_mapping\.js$/);
+    }
+  });
 
-      // all chunks AND modules should respect the passed extension
-      for (const file of deb.allModulesAllChunks()) {
-        expect(file.name).toMatch(/^(.*)\.cjs$/);
-      }
-    });
+  test("module and chunk IDs are correctly formatted", () => {
+    const deb = debundle(files, "cjs");
+
+    // chunks should all be on the top-level dir
+    for (const file of deb.allChunks()) {
+      expect(file.name).not.toMatch(/\//);
+    }
+
+    // modules should all live in the modules dir with a custom name
+    for (const file of deb.allModules()) {
+      expect(file.name).toMatch(/^modules.*/);
+    }
+
+    // all chunks AND modules should respect the passed extension
+    for (const file of deb.allModulesAllChunks()) {
+      expect(file.name).toMatch(/^(.*)\.cjs$/);
+    }
   });
 });
 
 describe("Webpack", () => {
-  const webpack4Simple = readBundle(
-    path.join(resolveExample("webpack4_47-simple"), "out")
-  );
+  const webpack4Simple = readBundle(resolveExampleBundle("webpack4_47-simple"));
 
   test("renaming files modifies ASTs", () => {
     const deb = debundle(webpack4Simple, "js");
@@ -104,5 +114,3 @@ describe("Webpack", () => {
     expect(chunk.name).toBe(originalName);
   });
 });
-
-// TODO add tests for auto-renaming
