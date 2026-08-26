@@ -1,7 +1,6 @@
 import type * as t from "@babel/types";
 
 export interface FileNode {
-  readonly id: string;
   readonly path: string;
   readonly ast: t.File;
 }

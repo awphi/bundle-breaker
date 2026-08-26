@@ -1,7 +1,6 @@
 import type { Bundle, FileNode, ParseBundleOptions, RawBundle } from "./types";
 import * as webpack from "./webpack";
 import { findDebundler, type Debundler } from "./debundler";
-import { createHash } from "crypto";
 import * as parser from "@babel/parser";
 import path from "path";
 
@@ -19,15 +18,12 @@ export function parseBundle(
     if (!exts.has(path.extname(filePath))) {
       continue;
     }
-    const id = createHash("sha1").update(filePath).digest("hex");
-    const node: FileNode = {
-      id,
+    files.set(filePath, {
       path: filePath,
       ast: parser.parse(code, {
         sourceType: "unambiguous",
       }),
-    };
-    files.set(id, node);
+    });
   }
   return { files };
 }
