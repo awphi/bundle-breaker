@@ -36,4 +36,27 @@ describe("parseBundle", () => {
 
     expect(result.files.size).toBe(0);
   });
+
+  it("should throw on syntax errors in the input files", () => {
+    const inputFiles = {
+      "file1.js": "console.log('File 1');",
+      "file2.cjs": "module.exports = {", // Syntax error: missing closing brace
+    };
+
+    expect(() => parseBundle(inputFiles)).toThrow();
+  });
+
+  it("should allow custom extensions to be specified", () => {
+    const inputFiles = {
+      "file1.js": "console.log('File 1');",
+      "file2.ts": "export const x = 42;",
+    };
+
+    const result = parseBundle(inputFiles, { extension: [".js", ".ts"] });
+
+    expect(Array.from(result.files.values())).toMatchObject([
+      { path: "file1.js" },
+      { path: "file2.ts" },
+    ]);
+  });
 });
