@@ -11,7 +11,7 @@ export interface RawBundle {
 
 export interface Bundle {
   readonly adapter: string;
-  readonly entry: string;
+  readonly entry: FileNode;
   readonly files: ReadonlyMap<string, FileNode>;
 }
 
