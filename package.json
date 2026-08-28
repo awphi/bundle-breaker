@@ -28,18 +28,16 @@
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",
   "dependencies": {
-    "@babel/generator": "^7.24.4",
-    "@babel/parser": "^7.24.4",
-    "@babel/traverse": "^7.24.1",
-    "@babel/types": "^7.24.0",
+    "@babel/generator": "^8.0.0",
+    "@babel/parser": "^8.0.4",
+    "@babel/traverse": "^8.0.4",
+    "@babel/types": "^8.0.4",
     "commander": "^12.0.0",
     "graphology": "^0.25.4",
     "graphology-gexf": "^0.13.0",
     "picocolors": "^1.0.1"
   },
   "devDependencies": {
-    "@types/babel__generator": "^7.6.8",
-    "@types/babel__traverse": "^7.20.6",
     "@types/node": "24.11.1",
     "tsdown": "^0.22.14",
     "typescript": "^7.0.2",

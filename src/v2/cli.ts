@@ -17,8 +17,8 @@ program
   .name(name)
   .description(description)
   .version(version)
-  .requiredOption("-o, --out", "output directory")
-  .argument("<input>", "bundle directory")
+  .requiredOption("-o, --out <directory>", "output directory")
+  .argument("<directory>", "bundle directory")
   .action(async (input: string, options: any) => {
     log(`read: reading bundle from ${input}`);
     const files = await read(input);

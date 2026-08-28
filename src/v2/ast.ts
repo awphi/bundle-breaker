@@ -13,7 +13,7 @@ export interface IdentifiedFunctionDeclaration extends t.FunctionDeclaration {
   id: t.Identifier;
 }
 
-export interface NormalMemberExpression extends t.MemberExpression {
+export interface NormalMemberExpression extends t.MemberExpressionNonComputed {
   property: t.Identifier;
 }
 
