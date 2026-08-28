@@ -21,7 +21,3 @@ export interface WebpackRuntimeChunkInfo {
   requireFn: WebpackRequireFnInfo;
   moduleMap: WebpackModuleMap;
 }
-
-export interface ModuleFileNode extends FileNode {
-  readonly originalId: string;
-}

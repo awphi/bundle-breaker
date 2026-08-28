@@ -1,21 +1,47 @@
-import { cloneFileNode } from "../ast";
 import type { Bundle, FileNode, RawBundle } from "../types";
-import { findAdditionalChunkModuleMap } from "./additional-chunks";
-import * as t from "@babel/types";
-import traverse from "@babel/traverse";
-import { replace } from "../visitor";
-import type { ModuleFileNode, WebpackModuleMap } from "./types";
-import { createPatchedRuntimeChunk, findRuntimeChunk } from "./runtime-chunk";
 import {
-  createModuleMappingChunk,
-  createModulesFromModuleMaps,
-} from "./module";
+  createStrippedAdditionalChunk,
+  findAdditionalChunkModuleMap,
+} from "./additional-chunks";
+import type { WebpackModuleMap } from "./types";
+import { createPatchedRuntimeChunk, findRuntimeChunk } from "./runtime-chunk";
+import { createModuleFilesFromMaps, updateRequireCalls } from "./module";
 
 export const name = "webpack";
 
 export function detect(bundle: RawBundle): number {
   // TODO
   return 1;
+}
+
+export function rename(
+  bundle: Bundle,
+  renames: ReadonlyMap<string, string>
+): Bundle {
+  const files = new Map(bundle.files.entries());
+  const oldToNew = new Map<string, string>();
+  const seenNewNames = new Set<string>();
+
+  for (const [id, file] of files.entries()) {
+    const newName = renames.get(id);
+    if (!newName) {
+      continue;
+    }
+    if (seenNewNames.has(newName)) {
+      throw new Error(
+        `Duplicate new name: ${newName}. New file names must be unique.`
+      );
+    }
+    seenNewNames.add(newName);
+    files.set(id, { ...file, path: newName });
+    oldToNew.set(file.path, newName);
+  }
+
+  for (const file of files.values()) {
+    updateRequireCalls(file.ast, oldToNew);
+  }
+
+  return { ...bundle, files };
 }
 
 export function split(bundle: RawBundle): Bundle {
@@ -30,35 +56,22 @@ export function split(bundle: RawBundle): Bundle {
     moduleMaps.set(files, moduleMap);
   }
 
-  const modules = createModulesFromModuleMaps(moduleMaps);
-  const files = new Map<string, FileNode>([...modules.entries()]);
+  const { files, mapping } = createModuleFilesFromMaps(moduleMaps);
 
-  const moduleMappingChunk = createModuleMappingChunk(modules);
-  files.set(moduleMappingChunk.path, moduleMappingChunk);
-
-  for (const [chunk, { expression }] of moduleMaps.entries()) {
+  for (const [chunk, moduleMap] of moduleMaps.entries()) {
     if (chunk === originalRuntime.chunk) {
       continue;
     }
 
-    const newModuleMapExpr = t.isArrayExpression(expression)
-      ? t.arrayExpression([])
-      : t.objectExpression([]);
-
-    const newChunk = cloneFileNode(chunk);
-    traverse(newChunk.ast, replace(expression, newModuleMapExpr));
+    const newChunk = createStrippedAdditionalChunk(chunk, moduleMap);
     files.set(newChunk.path, newChunk);
   }
 
-  const newRuntime = createPatchedRuntimeChunk(
-    originalRuntime,
-    moduleMappingChunk.path
-  );
+  const newRuntime = createPatchedRuntimeChunk(originalRuntime, mapping.path);
   files.set(newRuntime.path, newRuntime);
 
   return {
     adapter: name,
-    entry: newRuntime,
-    files: files,
+    files,
   };
 }

@@ -2,6 +2,9 @@ import * as t from "@babel/types";
 import type { FileNode } from "../types";
 import type { WebpackModuleMap } from "./types";
 import { makeModuleMap } from "./module-map";
+import { cloneFileNode } from "../ast";
+import { replace } from "../visitor";
+import traverse from "@babel/traverse";
 
 export function findAdditionalChunkModuleMap({
   ast,
@@ -32,4 +35,17 @@ export function findAdditionalChunkModuleMap({
   }
 
   throw new Error(`Failed to locate module map in file ${path}`);
+}
+
+export function createStrippedAdditionalChunk(
+  chunk: FileNode,
+  { expression }: WebpackModuleMap
+): FileNode {
+  const newModuleMapExpr = t.isArrayExpression(expression)
+    ? t.arrayExpression([])
+    : t.objectExpression([]);
+
+  const newChunk = cloneFileNode(chunk);
+  traverse(newChunk.ast, replace(expression, newModuleMapExpr));
+  return newChunk;
 }
