@@ -82,7 +82,7 @@ export function createModuleFilesFromMaps(
   const oldToNew = new Map<string, string>();
 
   for (const [chunk, { moduleFns }] of moduleMaps.entries()) {
-    for (const [moduleId, moduleFn] of Object.entries(moduleFns)) {
+    for (const [moduleId, moduleFn] of moduleFns.entries()) {
       if (oldToNew.has(moduleId)) {
         throw new Error(
           `Encountered module ID clash '${moduleId}' - found in ${oldToNew.get(
