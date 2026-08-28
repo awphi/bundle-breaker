@@ -26,16 +26,17 @@ function findModuleMapMemberExprInRequireFn(
   // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
   let result: NormalMemberExpression | undefined;
   traverse.cheap(fn, (node) => {
-    if (t.isCallExpression(node)) {
-      if (isNormalMemberExpression(node.callee)) {
-        if (
-          isNormalMemberExpression(node.callee.object) &&
-          t.isIdentifier(node.callee.property, { name: "call" })
-        ) {
-          result = node.callee.object;
-        } else {
-          result = node.callee;
-        }
+    if (result || !t.isCallExpression(node)) {
+      return;
+    }
+    if (isNormalMemberExpression(node.callee)) {
+      if (
+        isNormalMemberExpression(node.callee.object) &&
+        t.isIdentifier(node.callee.property, { name: "call" })
+      ) {
+        result = node.callee.object;
+      } else {
+        result = node.callee;
       }
     }
   });
@@ -94,7 +95,9 @@ function findRuntimeChunkModuleMap({ ast, path }: FileNode): WebpackModuleMap {
 export function findRuntimeChunk(
   files: IterableIterator<FileNode>
 ): WebpackRuntimeChunkInfo {
-  for (const file of files) {
+  const fileList = Array.from(files);
+
+  for (const file of fileList) {
     try {
       const requireFn = findWebpackRequireFn(file);
       const moduleMap = findRuntimeChunkModuleMap(file);
@@ -107,9 +110,7 @@ export function findRuntimeChunk(
     } catch (_) {}
   }
 
-  const names = Array.from(files)
-    .map((f) => f.path)
-    .join(", ");
+  const names = fileList.map((f) => f.path).join(", ");
   throw new Error(`Failed to find runtime file in files: ${names}`);
 }
 
