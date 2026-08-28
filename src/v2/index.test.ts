@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { parseBundle } from ".";
+import { parse } from ".";
 
-describe("parseBundle", () => {
+describe("parse", () => {
   it("should parse a bundle of files correctly", () => {
     const inputFiles = {
       "file1.js": "console.log('File 1');",
       "file2.cjs": "module.exports = {};",
     };
 
-    const result = parseBundle(inputFiles);
+    const result = parse(inputFiles);
 
     expect(Array.from(result.files.values())).toMatchObject([
       { path: "file1.js" },
@@ -23,7 +23,7 @@ describe("parseBundle", () => {
       "file3.cjs": "module.exports = {};",
     };
 
-    const result = parseBundle(inputFiles);
+    const result = parse(inputFiles);
 
     expect(Array.from(result.files.values())).toMatchObject([
       { path: "file1.mjs" },
@@ -32,7 +32,7 @@ describe("parseBundle", () => {
   });
 
   it("should handle empty input gracefully", () => {
-    const result = parseBundle({});
+    const result = parse({});
 
     expect(result.files.size).toBe(0);
   });
@@ -43,7 +43,7 @@ describe("parseBundle", () => {
       "file2.cjs": "module.exports = {", // Syntax error: missing closing brace
     };
 
-    expect(() => parseBundle(inputFiles)).toThrow();
+    expect(() => parse(inputFiles)).toThrow();
   });
 
   it("should allow custom extensions to be specified", () => {
@@ -52,7 +52,7 @@ describe("parseBundle", () => {
       "file2.ts": "export const x = 42;",
     };
 
-    const result = parseBundle(inputFiles, { extension: [".js", ".ts"] });
+    const result = parse(inputFiles, { extension: [".js", ".ts"] });
 
     expect(Array.from(result.files.values())).toMatchObject([
       { path: "file1.js" },

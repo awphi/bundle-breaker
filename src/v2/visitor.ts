@@ -1,4 +1,4 @@
-import { NodePath, type Visitor } from "@babel/traverse";
+import type { NodePath, Visitor } from "@babel/traverse";
 import * as t from "@babel/types";
 
 export function replace<R extends t.Node>(

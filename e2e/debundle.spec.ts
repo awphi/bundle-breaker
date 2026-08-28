@@ -1,5 +1,5 @@
-import { expect, test, describe, beforeEach } from "vitest";
-import { debundle, Debundle, WebpackDebundle } from "bundle-breaker";
+import { expect, test, describe } from "vitest";
+import { debundle, WebpackDebundle } from "bundle-breaker";
 import fs from "fs";
 import path from "path";
 import mockChunk from "./mock-chunk.json";
