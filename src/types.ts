@@ -1,38 +1,29 @@
-import * as t from "@babel/types";
+import type * as t from "@babel/types";
 
-export type AnyFunctionExpression =
-  | t.ArrowFunctionExpression
-  | t.FunctionExpression;
-
-export interface IifeCallExpression extends t.CallExpression {
-  callee: AnyFunctionExpression;
+export interface FileNode {
+  readonly path: string;
+  readonly ast: t.File;
 }
 
-export interface NamedAST {
-  name: string;
-  ast: t.File;
-  immutable?: boolean;
+export interface RawBundle {
+  readonly files: ReadonlyMap<string, FileNode>;
 }
 
-export interface Chunk extends NamedAST {
-  type: "chunk";
+export interface Bundle {
+  readonly adapter: string;
+  readonly files: ReadonlyMap<string, FileNode>;
 }
 
-export interface Module extends NamedAST {
-  src: Chunk;
-  type: "module";
+export interface GraphEdge {
+  readonly from: string;
+  readonly to: string;
 }
 
-export interface DeobfsucateOpts {
-  flipLiterals?: boolean;
-  voidLiteralToUndefined?: boolean;
-  verboseTrueFalse?: boolean;
-  decimalNumericLiterals?: boolean;
-  breakSequenceExpressions?: boolean;
-  enforceBlockStatementsOnIfs?: boolean;
-  splitVariableDeclarators?: boolean;
+export interface Graph {
+  readonly nodes: ReadonlySet<string>;
+  readonly edges: readonly GraphEdge[];
 }
 
-export type Mutable<T> = {
-  -readonly [P in keyof T]: T[P];
-};
+export interface ParseBundleOptions {
+  extension?: string[];
+}

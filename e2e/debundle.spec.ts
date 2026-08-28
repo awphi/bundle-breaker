@@ -23,6 +23,7 @@ function readBundle(dir: string): Record<string, string> {
   return result;
 }
 
+// TODO repair this suite
 describe.each(fs.readdirSync(examplesDir))("Debundle %s", (example) => {
   const files = readBundle(resolveExampleBundle(example));
 
