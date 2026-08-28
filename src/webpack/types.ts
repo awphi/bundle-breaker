@@ -1,8 +1,4 @@
-import type {
-  AnyFunctionExpression,
-  IdentifiedFunctionDeclaration,
-  NormalMemberExpression,
-} from "../ast";
+import type { AnyFunctionExpression } from "../ast";
 import type * as t from "@babel/types";
 import type { FileNode } from "../types";
 
@@ -11,13 +7,12 @@ export interface WebpackModuleMap {
   expression: t.ObjectExpression | t.ArrayExpression;
 }
 
-export interface WebpackRequireFnInfo {
-  functionDec: IdentifiedFunctionDeclaration;
-  moduleMapMemberExpr: NormalMemberExpression;
+export interface PatchedRuntimeChunk {
+  chunk: FileNode;
+  moduleMap: WebpackModuleMap;
 }
 
-export interface WebpackRuntimeChunkInfo {
+export interface StrippedAdditionalChunk {
   chunk: FileNode;
-  requireFn: WebpackRequireFnInfo;
   moduleMap: WebpackModuleMap;
 }

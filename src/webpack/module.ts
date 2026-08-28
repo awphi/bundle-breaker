@@ -5,10 +5,10 @@ import type { WebpackModuleMap } from "./types";
 import type { FileNode } from "../types";
 
 const MODULES_DIR = "modules";
-const MODULE_MAPPING_CHUNK_NAME = "module_mapping.js";
 
 export function createModuleMappingChunk(
-  oldToNew: Map<string, string>
+  oldToNew: Map<string, string>,
+  moduleMappingChunkName: string
 ): FileNode {
   // objects and arrays are indexed in the same way so just use an object for simplicity's sake
   const moduleMapObjectExpr = t.objectExpression(
@@ -31,7 +31,7 @@ export function createModuleMappingChunk(
 
   return {
     ast: moduleMappingAst,
-    path: MODULE_MAPPING_CHUNK_NAME,
+    path: moduleMappingChunkName,
   };
 }
 
@@ -76,22 +76,23 @@ export function updateRequireCalls(
 }
 
 export function createModuleFilesFromMaps(
-  moduleMaps: Map<FileNode, WebpackModuleMap>
-): { files: Map<string, FileNode>; mapping: FileNode } {
+  moduleMaps: Map<string, WebpackModuleMap>,
+  moduleMappingChunkName: string
+): Map<string, FileNode> {
   const files = new Map<string, FileNode>();
   const oldToNew = new Map<string, string>();
 
-  for (const [chunk, { moduleFns }] of moduleMaps.entries()) {
+  for (const [chunkPath, { moduleFns }] of moduleMaps.entries()) {
     for (const [moduleId, moduleFn] of moduleFns.entries()) {
       if (oldToNew.has(moduleId)) {
         throw new Error(
           `Encountered module ID clash '${moduleId}' - found in ${oldToNew.get(
             moduleId
-          )} and ${chunk.path}.`
+          )} and ${chunkPath}.`
         );
       }
 
-      const module = createFileForModule(chunk.path, moduleId, moduleFn);
+      const module = createFileForModule(chunkPath, moduleId, moduleFn);
       files.set(module.path, module);
       oldToNew.set(moduleId, module.path);
     }
@@ -101,8 +102,8 @@ export function createModuleFilesFromMaps(
     updateRequireCalls(module.ast, oldToNew);
   }
 
-  const mapping = createModuleMappingChunk(oldToNew);
+  const mapping = createModuleMappingChunk(oldToNew, moduleMappingChunkName);
   files.set(mapping.path, mapping);
 
-  return { files, mapping };
+  return files;
 }

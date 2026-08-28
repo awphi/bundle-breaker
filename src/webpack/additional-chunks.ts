@@ -1,18 +1,17 @@
 import * as t from "@babel/types";
 import type { FileNode } from "../types";
-import type { WebpackModuleMap } from "./types";
+import type { StrippedAdditionalChunk } from "./types";
 import { makeModuleMap } from "./module-map";
 import { cloneFileNode } from "../ast";
-import { replace } from "../visitor";
-import traverse from "@babel/traverse";
 
-export function findAdditionalChunkModuleMap({
-  ast,
-  path,
-}: FileNode): WebpackModuleMap {
+export function createStrippedAdditionalChunk(
+  chunk: FileNode
+): StrippedAdditionalChunk {
+  const newChunk = cloneFileNode(chunk);
+
   // look for a single expression program with a .push(arg) - could tighten this up but seems to get the job done for now
-  if (ast.program.body.length === 1) {
-    const call = ast.program.body[0];
+  if (newChunk.ast.program.body.length === 1) {
+    const call = newChunk.ast.program.body[0];
     if (
       t.isExpressionStatement(call) &&
       t.isCallExpression(call.expression) &&
@@ -29,23 +28,14 @@ export function findAdditionalChunkModuleMap({
         param.elements.length >= 2 &&
         t.isExpression(param.elements[1])
       ) {
-        return makeModuleMap(param.elements[1]);
+        const moduleMap = makeModuleMap(param.elements[1]);
+        param.elements[1] = t.isArrayExpression(moduleMap.expression)
+          ? t.arrayExpression([])
+          : t.objectExpression([]);
+        return { chunk: newChunk, moduleMap };
       }
     }
   }
 
-  throw new Error(`Failed to locate module map in file ${path}`);
-}
-
-export function createStrippedAdditionalChunk(
-  chunk: FileNode,
-  { expression }: WebpackModuleMap
-): FileNode {
-  const newModuleMapExpr = t.isArrayExpression(expression)
-    ? t.arrayExpression([])
-    : t.objectExpression([]);
-
-  const newChunk = cloneFileNode(chunk);
-  traverse(newChunk.ast, replace(expression, newModuleMapExpr));
-  return newChunk;
+  throw new Error(`Failed to locate module map in file ${newChunk.path}`);
 }

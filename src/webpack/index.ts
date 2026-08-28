@@ -1,13 +1,11 @@
 import type { Bundle, FileNode, RawBundle } from "../types";
-import {
-  createStrippedAdditionalChunk,
-  findAdditionalChunkModuleMap,
-} from "./additional-chunks";
+import { createStrippedAdditionalChunk } from "./additional-chunks";
 import type { WebpackModuleMap } from "./types";
-import { createPatchedRuntimeChunk, findRuntimeChunk } from "./runtime-chunk";
+import { createPatchedRuntimeChunk } from "./runtime-chunk";
 import { createModuleFilesFromMaps, updateRequireCalls } from "./module";
 
 export const name = "webpack";
+const MODULE_MAPPING_CHUNK_NAME = "module_mapping.js";
 
 export function detect(bundle: RawBundle): number {
   // TODO
@@ -45,30 +43,34 @@ export function rename(
 }
 
 export function split(bundle: RawBundle): Bundle {
-  const originalRuntime = findRuntimeChunk(bundle.files.values());
+  const runtime = createPatchedRuntimeChunk(
+    bundle.files.values(),
+    MODULE_MAPPING_CHUNK_NAME
+  );
 
-  const moduleMaps = new Map<FileNode, WebpackModuleMap>();
-  for (const files of bundle.files.values()) {
-    const isRuntimeChunk = files === originalRuntime.chunk;
-    const moduleMap = isRuntimeChunk
-      ? originalRuntime.moduleMap
-      : findAdditionalChunkModuleMap(files);
-    moduleMaps.set(files, moduleMap);
-  }
+  const moduleMaps = new Map<string, WebpackModuleMap>();
+  moduleMaps.set(runtime.chunk.path, runtime.moduleMap);
 
-  const { files, mapping } = createModuleFilesFromMaps(moduleMaps);
+  const files = new Map<string, FileNode>();
+  files.set(runtime.chunk.path, runtime.chunk);
 
-  for (const [chunk, moduleMap] of moduleMaps.entries()) {
-    if (chunk === originalRuntime.chunk) {
+  for (const [path, chunk] of bundle.files) {
+    if (path === runtime.chunk.path) {
       continue;
     }
 
-    const newChunk = createStrippedAdditionalChunk(chunk, moduleMap);
-    files.set(newChunk.path, newChunk);
+    const stripped = createStrippedAdditionalChunk(chunk);
+    moduleMaps.set(path, stripped.moduleMap);
+    files.set(stripped.chunk.path, stripped.chunk);
   }
 
-  const newRuntime = createPatchedRuntimeChunk(originalRuntime, mapping.path);
-  files.set(newRuntime.path, newRuntime);
+  const moduleFiles = createModuleFilesFromMaps(
+    moduleMaps,
+    MODULE_MAPPING_CHUNK_NAME
+  );
+  for (const [path, file] of moduleFiles) {
+    files.set(path, file);
+  }
 
   return {
     adapter: name,
