@@ -77,24 +77,12 @@ export function isNormalMemberExpression(
   );
 }
 
-/**
- * Checks that `idPath` is a genuine reference resolving (via scope, not name
- * string comparison) to `target`'s own binding. Minifiers routinely reuse
- * short identifier names across unrelated scopes (e.g. a require function
- * named `i` and, in a completely different nested closure, an unrelated
- * local variable that also happens to be named `i`) - comparing names alone
- * would conflate the two. This is the check that keeps them apart.
- */
-export function referencesBinding(idPath: NodePath, target: t.Node): boolean {
+export function isSameBinding(idPath: NodePath, target: t.Node): boolean {
   if (!idPath.isReferencedIdentifier()) return false;
   const binding = idPath.scope.getBinding(idPath.node.name);
   return binding !== undefined && binding.path.node === target;
 }
 
-/** Strips all comments from `node` and its descendants in place - used to
- * drop webpack's own module-boundary marker comments, which would otherwise
- * leak into extracted module bodies once they're no longer sitting inside
- * the original module-map/wrapper-function context. */
 export function stripComments(node: t.Node): void {
   t.traverseFast(node, (n) => {
     n.leadingComments = null;
@@ -103,9 +91,7 @@ export function stripComments(node: t.Node): void {
   });
 }
 
-/** Walks up from `path` to the nearest ancestor statement that is itself one
- * of `candidates` (a specific, known list of statements). */
-export function findEnclosingStatement(
+export function findEnclosingStatementAmong(
   path: NodePath,
   candidates: readonly t.Statement[]
 ): t.Statement | undefined {
@@ -115,9 +101,7 @@ export function findEnclosingStatement(
   return stmtPath ? (stmtPath.node as t.Statement) : undefined;
 }
 
-/** If `stmt` is a no-argument IIFE call with a block body, returns that
- * block's own statement list. */
-export function getIifeBody(stmt: t.Statement): t.Statement[] | undefined {
+export function getNoArgIifeBody(stmt: t.Statement): t.Statement[] | undefined {
   const iife = getIifeCallExpression(stmt);
   if (iife && iife.arguments.length === 0 && t.isBlockStatement(iife.callee.body)) {
     return iife.callee.body.body;

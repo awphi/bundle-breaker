@@ -21,10 +21,7 @@ function makeModuleMapFromObject(expr: t.ObjectExpression): WebpackModuleMap {
     if (t.isObjectProperty(prop) && isAnyFunctionExpression(prop.value)) {
       moduleFns.set(moduleId, prop.value);
     } else if (t.isObjectMethod(prop, { kind: "method" })) {
-      // recent webpack5 versions render module wrapper functions as ES6 shorthand
-      // methods (e.g. `207(module) {...}`) rather than `207: (module) => {...}`
-      const fn = extractObjectMethodFunction(prop);
-      moduleFns.set(moduleId, fn);
+      moduleFns.set(moduleId, extractObjectMethodFunction(prop));
     }
   }
 
@@ -57,13 +54,6 @@ export function makeModuleMap(expr?: t.Node): WebpackModuleMap {
   );
 }
 
-/**
- * Like `makeModuleMap`, but never throws - returns undefined if `expr` isn't
- * an object/array expression, or if it doesn't contain any module functions.
- * Used to trial-parse candidate expressions when we don't yet know which one
- * (if any) is the real module map, matched by content rather than by which
- * declaration/property name webpack happened to wrap it in.
- */
 export function tryMakeModuleMap(
   expr: t.Node | null | undefined
 ): WebpackModuleMap | undefined {

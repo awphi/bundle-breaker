@@ -17,44 +17,34 @@ import { makeModuleMap, tryMakeModuleMap } from "./module-map";
 import { findEntryIdInAdditionalChunk, findEntryIdInRuntimeChunk, findEntryTrailingCode } from "./entry";
 import { findRelocatableHelperStatements } from "./helpers";
 
-/**
- * Confirms `fn` really is a webpack require function by finding the
- * module-execution call inside its body, structurally, without caring what
- * anything is named. Two shapes are matched:
- *  - WP5 (no `.call`): `__webpack_modules__[moduleId](module, exports, require)`
- *    - a direct call whose callee is itself a *computed* member expression
- *      (indexing the module map by a variable id)
- *  - WP4 (`.call`): `modules[moduleId].call(module.exports, module, exports, require)`
- *    - a call to `.call` (non-computed) on a computed member expression
- * Throws if neither shape is found anywhere in `fn`.
- */
-function assertLooksLikeRequireFunction(
-  fn: IdentifiedFunctionDeclaration
-): void {
+function isComputedMemberCall(callee: t.Node): boolean {
+  return t.isMemberExpression(callee, { computed: true });
+}
+
+function isDotCallOnComputedMember(callee: t.Node): boolean {
+  return (
+    isNormalMemberExpression(callee) &&
+    t.isIdentifier(callee.property, { name: "call" }) &&
+    t.isMemberExpression(callee.object, { computed: true })
+  );
+}
+
+function containsModuleExecutionCall(fn: IdentifiedFunctionDeclaration): boolean {
   let found = false;
 
   traverse.cheap(fn, (node) => {
     if (found || !t.isCallExpression(node)) return;
-    const callee = node.callee;
-
-    if (t.isMemberExpression(callee, { computed: true })) {
-      found = true;
-      return;
-    }
-    if (
-      isNormalMemberExpression(callee) &&
-      t.isIdentifier(callee.property, { name: "call" }) &&
-      t.isMemberExpression(callee.object, { computed: true })
-    ) {
-      found = true;
-    }
+    found = isComputedMemberCall(node.callee) || isDotCallOnComputedMember(node.callee);
   });
 
-  if (!found) {
-    throw new Error(
-      `Unable to find module map member expression in function ${fn.id.name}`
-    );
-  }
+  return found;
+}
+
+function findLastFunctionDeclaration(
+  body: readonly t.Statement[]
+): IdentifiedFunctionDeclaration | undefined {
+  const decs = body.filter(isIdentifiedFunctionDeclaration);
+  return decs.at(-1);
 }
 
 function findRequireFunction({
@@ -62,94 +52,87 @@ function findRequireFunction({
   path,
 }: FileNode): IdentifiedFunctionDeclaration {
   const body = maybeUnwrapTopLevelIife(ast.program);
-  const functionDecs = body.filter(isIdentifiedFunctionDeclaration);
-  if (functionDecs.length === 0) {
+  const candidate = findLastFunctionDeclaration(body);
+  if (!candidate || !containsModuleExecutionCall(candidate)) {
     throw new Error(`Unable to find webpack require function in file ${path}`);
   }
-
-  // most bundles have just one function declaration (the require fn),
-  // however some webpack4 configs with runtime chunk splitting have
-  // multiple, with the *last* one being the require fn
-  const functionDec = functionDecs[functionDecs.length - 1];
-  assertLooksLikeRequireFunction(functionDec);
-  return functionDec;
+  return candidate;
 }
 
-function findModuleMapInRuntimeChunk({
-  ast,
-  path,
-}: FileNode): WebpackModuleMap {
-  const iife = getIifeCallExpression(ast.program.body[0]);
-  if (ast.program.body.length === 1 && iife && iife.arguments.length === 1) {
-    // webpack 4 - the modules included in the runtime chunk are passed as
-    // the first and only arg to the main iife
+function findModuleMapFromIifeArgument(
+  program: t.Program
+): WebpackModuleMap | undefined {
+  const iife = getIifeCallExpression(program.body[0]);
+  if (program.body.length === 1 && iife && iife.arguments.length === 1) {
     return makeModuleMap(iife.arguments[0]);
   }
+  return undefined;
+}
 
-  // webpack 5 - there exists a __webpack_modules__ variable in the body; we
-  // expect the module map expression to be the first object-initialized
-  // declarator in the first non-empty variable declaration
-  const body = maybeUnwrapTopLevelIife(ast.program);
+function findModuleMapFromVariableDeclaration(
+  body: readonly t.Statement[]
+): WebpackModuleMap | undefined {
   const firstVariableDec = body.find((v) => t.isVariableDeclaration(v));
   for (const declarator of firstVariableDec?.declarations ?? []) {
     if (t.isObjectExpression(declarator.init)) {
       return makeModuleMap(declarator.init);
     }
   }
+  return undefined;
+}
 
-  throw new Error(`Failed to locate module map in file ${path}`);
+function findModuleMapInRuntimeChunk({
+  ast,
+  path,
+}: FileNode): WebpackModuleMap {
+  const moduleMap =
+    findModuleMapFromIifeArgument(ast.program) ??
+    findModuleMapFromVariableDeclaration(maybeUnwrapTopLevelIife(ast.program));
+  if (!moduleMap) {
+    throw new Error(`Failed to locate module map in file ${path}`);
+  }
+  return moduleMap;
+}
+
+function isRuntimeChunk(file: FileNode): boolean {
+  try {
+    findRequireFunction(file);
+    findModuleMapInRuntimeChunk(file);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function findRuntimeChunkFile(files: readonly FileNode[]): FileNode {
-  for (const file of files) {
-    try {
-      findRequireFunction(file);
-      findModuleMapInRuntimeChunk(file);
-      return file;
-    } catch {
-      // not the runtime chunk - keep looking
-    }
+  const file = files.find(isRuntimeChunk);
+  if (!file) {
+    const names = files.map((f) => f.path).join(", ");
+    throw new Error(`Failed to find runtime file in files: ${names}`);
   }
-
-  const names = files.map((f) => f.path).join(", ");
-  throw new Error(`Failed to find runtime file in files: ${names}`);
+  return file;
 }
 
 export function readRuntimeChunk(file: FileNode): RuntimeChunkInfo {
   const requireFn = findRequireFunction(file);
   const moduleMap = findModuleMapInRuntimeChunk(file);
   const topLevelBody = maybeUnwrapTopLevelIife(file.ast.program);
-  const helperStatements = findRelocatableHelperStatements(
-    file.ast,
-    requireFn,
-    topLevelBody
-  );
-  const entryId = findEntryIdInRuntimeChunk(file.ast, requireFn);
-  const trailingStatements =
-    entryId === undefined
-      ? findEntryTrailingCode(file.ast, requireFn, topLevelBody)
-      : [];
 
   return {
     path: file.path,
     requireFnName: requireFn.id.name,
     moduleMap,
-    helperStatements,
-    entryId,
-    trailingStatements,
+    relocatableHelperStatements: findRelocatableHelperStatements(
+      file.ast,
+      requireFn,
+      topLevelBody
+    ),
+    entryId: findEntryIdInRuntimeChunk(file.ast, requireFn),
+    resolveEntryTrailingCode: () =>
+      findEntryTrailingCode(file.ast, requireFn, topLevelBody),
   };
 }
 
-/**
- * Collects every expression in `program` that *could* be the chunk's module
- * map, across all three known chunk shapes:
- *  - jsonp: `(jsonpArray).push([chunkIds, modules, executeModules?])`
- *  - commonjs (`chunkFormat: "commonjs"`): `exports.<name> = <value>;`
- *  - module (`chunkFormat: "module"`): `export const <name> = <value>;`
- * Candidates are matched by shape only - which property/declaration actually
- * holds the module map is decided later, by content (`tryMakeModuleMap`), not
- * by name.
- */
 function findModuleMapCandidates(program: t.Program): t.Expression[] {
   const candidates: t.Expression[] = [];
 

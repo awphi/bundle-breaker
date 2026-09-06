@@ -14,8 +14,6 @@ export const RUNTIME_SHIM_PATH: string = path.posix.join(
 
 const MODULE_PARAM_NAMES = ["module", "exports", "require"];
 
-/** Module ids can be plain numbers or short hashed strings - sanitize before
- * using as a filename. */
 export function sanitizeModuleId(id: string): string {
   const sanitized = id.replace(/[^a-zA-Z0-9_.-]/g, "_");
   return sanitized.length > 0 ? sanitized : "_";
@@ -32,22 +30,11 @@ export function relativeRequirePath(fromPath: string, toPath: string): string {
   return rel;
 }
 
-/**
- * Positionally renames a webpack module function's params to
- * `module`/`exports`/`require` (ignoring their original, possibly-minified
- * names) and hoists its body to a flat statement list, ready to become a
- * standalone file's Program body. Uses babel's own scope-aware rename so
- * every reference (including in nested closures) is updated correctly, not
- * just the declaration.
- */
-function hoistModuleBody(fn: AnyFunctionExpression): t.Statement[] {
-  const cloned = t.cloneNode(fn, true) as AnyFunctionExpression;
-  stripComments(cloned);
-  const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
-
+function renameParamsPositionally(fn: AnyFunctionExpression): void {
+  const wrapper = t.file(t.program([t.expressionStatement(fn)]));
   traverse(wrapper, {
     Function(fnPath) {
-      if (fnPath.node !== cloned) return;
+      if (fnPath.node !== fn) return;
       fnPath.node.params.forEach((param, i) => {
         const newName = MODULE_PARAM_NAMES[i];
         if (newName && t.isIdentifier(param) && param.name !== newName) {
@@ -57,6 +44,12 @@ function hoistModuleBody(fn: AnyFunctionExpression): t.Statement[] {
       fnPath.stop();
     },
   });
+}
+
+function hoistModuleBody(fn: AnyFunctionExpression): t.Statement[] {
+  const cloned = t.cloneNode(fn, true) as AnyFunctionExpression;
+  stripComments(cloned);
+  renameParamsPositionally(cloned);
 
   const body = cloned.body;
   return t.isBlockStatement(body) ? body.body : [t.expressionStatement(body)];
@@ -74,8 +67,6 @@ function createFile(
   return { path: filePath, ast: file };
 }
 
-/** Builds a regular module file (`index.js` or `modules/<id>.js`) from its
- * original webpack module function. */
 export function createModuleFile(
   fn: AnyFunctionExpression,
   filePath: string,
@@ -84,8 +75,6 @@ export function createModuleFile(
   return createFile(filePath, hoistModuleBody(fn), "require", resolveModuleId);
 }
 
-/** Builds `index.js` from the runtime chunk's own leftover top-level
- * statements, for bundles with no numbered entry module at all. */
 export function createEntryFileFromTrailingCode(
   statements: readonly t.Statement[],
   requireFnName: string,
@@ -96,19 +85,8 @@ export function createEntryFileFromTrailingCode(
   return createFile(ENTRY_PATH, cloned, requireFnName, resolveModuleId);
 }
 
-// ---------------------------------------------------------------------------
-// The runtime shim
-// ---------------------------------------------------------------------------
-
 const SHIM_FUNCTION_NAME = "__wp";
 
-/**
- * Clones `stmt` and renames every reference to `requireFnName` within it to
- * the shim's own function name - a relocated property that calls back into
- * "the require function" (e.g. `.t`'s `this(value)` branch, or `.O`'s
- * recursive `__webpack_require__.O` self-reference) now means the shim's own
- * callable id->path require function instead.
- */
 function renameToShimFunction(
   stmt: t.Statement,
   requireFnName: string
@@ -128,14 +106,6 @@ function renameToShimFunction(
   return cloned;
 }
 
-/**
- * Builds the shared `__webpack_runtime.js` file: the relocated
- * `<requireFn>.X = ...` helper statements (verbatim, whatever `X` turned out
- * to be), plus a real callable require-shim backed by an id->relative-path
- * lookup table covering every module in the whole bundle. This is what both
- * the relocated properties (closing back over "the require function") and
- * dynamic/computed require calls elsewhere route through.
- */
 export function createRuntimeShimFile(
   helperStatements: readonly t.Statement[],
   requireFnName: string,

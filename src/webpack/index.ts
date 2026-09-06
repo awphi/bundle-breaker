@@ -10,6 +10,7 @@ import {
   relativeRequirePath,
   RUNTIME_SHIM_PATH,
 } from "./output";
+import { fileRequires } from "./rewrite";
 
 export const name = "webpack";
 
@@ -63,8 +64,9 @@ export function split(bundle: RawBundle): Bundle {
     );
   }
 
-  const usingTrailingStatements = entryId === undefined;
-  if (usingTrailingStatements && runtimeInfo.trailingStatements.length === 0) {
+  const entryTrailingCode =
+    entryId === undefined ? runtimeInfo.resolveEntryTrailingCode() : [];
+  if (entryId === undefined && entryTrailingCode.length === 0) {
     throw new Error(
       `Failed to find an entry point anywhere in the bundle (file: ${runtimeChunkFile.path})`
     );
@@ -90,26 +92,32 @@ export function split(bundle: RawBundle): Bundle {
     outFiles.set(file.path, file);
   }
 
-  if (usingTrailingStatements) {
+  if (entryId === undefined) {
     const file = createEntryFileFromTrailingCode(
-      runtimeInfo.trailingStatements,
+      entryTrailingCode,
       runtimeInfo.requireFnName,
       makeResolveId(ENTRY_PATH)
     );
     outFiles.set(file.path, file);
   }
 
-  const shimIdToPath = new Map<string, string>();
-  for (const [id, targetPath] of idToPath) {
-    shimIdToPath.set(id, relativeRequirePath(RUNTIME_SHIM_PATH, targetPath));
-  }
-  const shimFile = createRuntimeShimFile(
-    runtimeInfo.helperStatements,
-    runtimeInfo.requireFnName,
-    shimIdToPath,
-    RUNTIME_SHIM_PATH
+  const shimIsNeeded = [...outFiles.values()].some((file) =>
+    fileRequires(file.ast, relativeRequirePath(file.path, RUNTIME_SHIM_PATH))
   );
-  outFiles.set(shimFile.path, shimFile);
+
+  if (shimIsNeeded) {
+    const shimIdToPath = new Map<string, string>();
+    for (const [id, targetPath] of idToPath) {
+      shimIdToPath.set(id, relativeRequirePath(RUNTIME_SHIM_PATH, targetPath));
+    }
+    const shimFile = createRuntimeShimFile(
+      runtimeInfo.relocatableHelperStatements,
+      runtimeInfo.requireFnName,
+      shimIdToPath,
+      RUNTIME_SHIM_PATH
+    );
+    outFiles.set(shimFile.path, shimFile);
+  }
 
   return { adapter: name, files: outFiles };
 }
