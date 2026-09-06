@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { program } from "commander";
 import { version, description, name } from "../package.json";
-import { parse, read, save, split } from ".";
+import { load, parse, read, save, split } from ".";
 
 function timestamp(): string {
   return new Date().toLocaleTimeString("en-GB", { timeStyle: "medium" });
@@ -20,13 +20,9 @@ program
   .requiredOption("-o, --out <directory>", "output directory")
   .argument("<directory>", "bundle directory")
   .action(async (input: string, options: any) => {
-    log(`read: reading bundle from ${input}`);
-    const files = await read(input);
-    log(`read: read ${Object.keys(files).length} file(s)`);
-
-    log(`parse: parsing started`);
-    const rawBundle = parse(files);
-    log(`parse: parsing complete`);
+    log(`loading: loading bundle from ${input}`);
+    const rawBundle = await load(input);
+    log(`load: loaded ${rawBundle.files.size} file(s)`);
 
     log(`split: splitting bundle into modules`);
     const bundle = split(rawBundle);
