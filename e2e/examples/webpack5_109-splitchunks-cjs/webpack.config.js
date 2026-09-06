@@ -2,6 +2,10 @@ const path = require("path");
 
 module.exports = {
   context: path.resolve(__dirname),
+  cache: {
+    type: "filesystem",
+    buildDependencies: { config: [__filename] },
+  },
   mode: "production",
   entry: {
     index: path.resolve(__dirname, "index.js"),

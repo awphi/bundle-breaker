@@ -4,6 +4,10 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 
 module.exports = {
   context: path.resolve(__dirname),
+  cache: {
+    type: "filesystem",
+    buildDependencies: { config: [__filename] },
+  },
   mode: "production",
   entry: {
     index: path.resolve(__dirname, "src", "index.js"),
