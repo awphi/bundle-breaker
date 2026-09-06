@@ -1,38 +1,53 @@
 import traverse from "@babel/traverse";
+import type { NodePath } from "@babel/traverse";
+import * as t from "@babel/types";
 import {
-  cloneFileNode,
   getIifeCallExpression,
   isIdentifiedFunctionDeclaration,
   isNormalMemberExpression,
   maybeUnwrapTopLevelIife,
+  referencesBinding,
   type IdentifiedFunctionDeclaration,
-  type NormalMemberExpression,
 } from "../ast";
 import type { FileNode } from "../types";
-import type { PatchedRuntimeChunk, WebpackModuleMap } from "./types";
-import * as t from "@babel/types";
+import type { RuntimeChunkInfo, WebpackModuleMap } from "./types";
 import { makeModuleMap } from "./module-map";
+import { findShapeAEntryId, findShapeCEntryId } from "./entry";
 
+/**
+ * Finds the module-execution call inside the require function's body -
+ * confirms this function really is a webpack require function, structurally,
+ * without caring what anything is named. Two shapes are matched:
+ *  - WP5 (no `.call`): `__webpack_modules__[moduleId](module, exports, require)`
+ *    - a direct call whose callee is itself a *computed* member expression
+ *      (indexing the module map by a variable id)
+ *  - WP4 (`.call`): `modules[moduleId].call(module.exports, module, exports, require)`
+ *    - a call to `.call` (non-computed) on a computed member expression
+ * The returned member expression (the module-map lookup itself) isn't used
+ * by callers today - this only needs to throw when no match is found.
+ */
 function findModuleMapMemberExprInRequireFn(
   fn: IdentifiedFunctionDeclaration
-): NormalMemberExpression {
-  // find the first call expression on a member expression
-  // in WP5 this looks like __webpack_modules__[moduleId](module, module.exports, __webpack_require__)
-  // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-  let result: NormalMemberExpression | undefined;
+): t.MemberExpression {
+  let result: t.MemberExpression | undefined;
+
   traverse.cheap(fn, (node) => {
     if (result || !t.isCallExpression(node)) {
       return;
     }
-    if (isNormalMemberExpression(node.callee)) {
-      if (
-        isNormalMemberExpression(node.callee.object) &&
-        t.isIdentifier(node.callee.property, { name: "call" })
-      ) {
-        result = node.callee.object;
-      } else {
-        result = node.callee;
-      }
+    const callee = node.callee;
+
+    if (t.isMemberExpression(callee, { computed: true })) {
+      result = callee;
+      return;
+    }
+
+    if (
+      isNormalMemberExpression(callee) &&
+      t.isIdentifier(callee.property, { name: "call" }) &&
+      t.isMemberExpression(callee.object, { computed: true })
+    ) {
+      result = callee.object;
     }
   });
 
@@ -88,7 +103,7 @@ function findRuntimeChunkModuleMap({ ast, path }: FileNode): WebpackModuleMap {
   throw new Error(`Failed to locate module map in file ${path}`);
 }
 
-function findRuntimeChunk(files: readonly FileNode[]): FileNode {
+export function findRuntimeChunk(files: readonly FileNode[]): FileNode {
   for (const file of files) {
     try {
       findWebpackRequireFn(file);
@@ -101,96 +116,279 @@ function findRuntimeChunk(files: readonly FileNode[]): FileNode {
   throw new Error(`Failed to find runtime file in files: ${names}`);
 }
 
-function patchRuntimeChunk(
-  chunk: FileNode,
-  moduleMappingChunkName: string
-): PatchedRuntimeChunk {
-  const newRuntime = cloneFileNode(chunk);
-  const requireIdentifier = t.identifier("require");
-  const body = maybeUnwrapTopLevelIife(newRuntime.ast.program);
-  const functionDec = findWebpackRequireFn(newRuntime);
+/**
+ * Checks whether `right` (an assignment's value) references anything besides
+ * true globals, the require function itself, or its own locally-bound
+ * identifiers - i.e. whether it's safe to relocate verbatim into the runtime
+ * shim without dragging along bundler-local closure state (the module
+ * registry, cache, chunk-loading tables, ...).
+ */
+function isSelfContained(
+  rightPath: NodePath,
+  requireFn: IdentifiedFunctionDeclaration
+): boolean {
+  let ok = true;
 
-  // in WP5 this looks like __webpack_modules__[moduleId](module, module.exports, __webpack_require__)
-  // in WP4 this looks like modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-  let patchedRequireCall = false;
-  traverse.cheap(functionDec, (node) => {
-    if (patchedRequireCall || !t.isCallExpression(node)) {
-      return;
-    }
-    if (isNormalMemberExpression(node.callee)) {
-      const callee = node.callee;
+  function check(idPath: NodePath): void {
+    if (!ok || !idPath.isReferencedIdentifier()) return;
+    if (referencesBinding(idPath, requireFn)) return; // self-reference
 
-      // look in module_mapping first to deal with computed IDs and unprocessed require calls
-      // if not found then we've probably modified it so we can assume it's a module file on disk
-      // this boils down to something like `require(__webpack_modules__[moduleId] || "./modules/" + moduleId)(...)`
-      if (
-        isNormalMemberExpression(callee.object) &&
-        t.isIdentifier(callee.property, { name: "call" })
-      ) {
-        const target = callee.object;
-        const withFallback = t.logicalExpression(
-          "||",
-          t.cloneNode(target, true),
-          t.cloneNode(target.property, true)
-        );
-        callee.object = t.callExpression(requireIdentifier, [withFallback]);
-      } else {
-        const withFallback = t.logicalExpression(
-          "||",
-          t.cloneNode(callee, true),
-          t.cloneNode(callee.property, true)
-        );
-        node.callee = t.callExpression(requireIdentifier, [withFallback]);
-      }
-      patchedRequireCall = true;
-    }
-  });
-  if (!patchedRequireCall) {
-    throw new Error(
-      `Unable to find module map member expression in function ${functionDec.id.name}`
-    );
-  }
+    const binding = idPath.scope.getBinding(idPath.node.name);
+    if (!binding) return; // true global
 
-  const mappingRequireCall = t.callExpression(requireIdentifier, [
-    t.stringLiteral(moduleMappingChunkName),
-  ]);
-  let moduleMap: WebpackModuleMap | undefined;
-  const iife = getIifeCallExpression(newRuntime.ast.program.body[0]);
-  if (
-    newRuntime.ast.program.body.length === 1 &&
-    iife &&
-    iife.arguments.length == 1
-  ) {
-    // webpack 4 - the modules included in the runtime chunk are passed as the first and only arg to the main iife
-    const arg = iife.arguments[0];
-    if (t.isExpression(arg)) {
-      moduleMap = makeModuleMap(arg);
-      iife.arguments[0] = mappingRequireCall;
-    }
-  } else {
-    // webpack 5 - there exists a __webpack_modules__ variable in the body; we expect the module map
-    // expression to be the first object-initialized declarator in the first non-empty variable declaration
-    const firstVariableDec = body.find((v) => t.isVariableDeclaration(v));
-    for (const declarator of firstVariableDec?.declarations ?? []) {
-      if (t.isObjectExpression(declarator.init)) {
-        moduleMap = makeModuleMap(declarator.init);
-        declarator.init = mappingRequireCall;
+    let withinSubtree = false;
+    let p: NodePath | null = binding.path;
+    while (p) {
+      if (p.node === rightPath.node) {
+        withinSubtree = true;
         break;
       }
+      p = p.parentPath;
+    }
+    if (!withinSubtree) ok = false;
+  }
+
+  if (rightPath.isIdentifier()) {
+    check(rightPath);
+  } else {
+    rightPath.traverse({ Identifier: check });
+  }
+
+  return ok;
+}
+
+/** Walks up from `path` to the nearest ancestor statement that is itself an
+ * element of `body` (a specific, known list of top-level statements). */
+function findEnclosingStatementIn(
+  path: NodePath,
+  body: readonly t.Statement[]
+): t.Statement | undefined {
+  const stmtPath = path.find(
+    (p) => t.isStatement(p.node) && body.includes(p.node as t.Statement)
+  );
+  return stmtPath ? (stmtPath.node as t.Statement) : undefined;
+}
+
+/** If `stmt` is a no-argument IIFE call with a block body, returns that
+ * block's own statement list. */
+function getIifeBlockBody(stmt: t.Statement): t.Statement[] | undefined {
+  const iife = getIifeCallExpression(stmt);
+  if (iife && iife.arguments.length === 0 && t.isBlockStatement(iife.callee.body)) {
+    return iife.callee.body.body;
+  }
+  return undefined;
+}
+
+/**
+ * Structurally collects whole top-level statements safe to relocate verbatim
+ * into the runtime shim - wherever a `<requireFn>.<key> = <value>`
+ * assignment is found (any depth of wrapping, webpack5 typically wraps each
+ * in its own "runtime module" IIFE), no property name is ever checked, only
+ * assignment shape and value closure - this holds regardless of webpack
+ * version or a custom runtime template renaming/adding/removing properties.
+ * `requireFn` identity is checked via scope binding, not name - minifiers
+ * routinely reuse the same short name across unrelated scopes.
+ *
+ * Some properties (e.g. `.t`'s memoization cache, `.O`'s deferred queue)
+ * close over private sibling state declared alongside them in the same
+ * wrapping IIFE, not just the assignment's own value - so this operates at
+ * whole-statement granularity, not bare-assignment granularity, falling back
+ * to the narrower per-assignment check only when the wrapping statement also
+ * contains other, non-declaration statements (i.e. real eager side effects
+ * we don't want to drag along, as opposed to safe passive declarations).
+ */
+function collectHelperStatements(
+  ast: t.File,
+  requireFn: IdentifiedFunctionDeclaration,
+  topLevelBody: readonly t.Statement[]
+): t.Statement[] {
+  const assignmentsByStatement = new Map<
+    t.Statement,
+    NodePath<t.AssignmentExpression>[]
+  >();
+
+  traverse(ast, {
+    AssignmentExpression(path) {
+      const { left, operator } = path.node;
+      if (operator !== "=") return;
+      if (!isNormalMemberExpression(left)) return;
+
+      const objPath = path.get("left.object") as NodePath;
+      if (!objPath.isIdentifier() || !referencesBinding(objPath, requireFn)) {
+        return;
+      }
+
+      const stmt = findEnclosingStatementIn(path, topLevelBody);
+      if (!stmt) return;
+
+      const list = assignmentsByStatement.get(stmt) ?? [];
+      list.push(path);
+      assignmentsByStatement.set(stmt, list);
+    },
+  });
+
+  const result: t.Statement[] = [];
+
+  for (const [stmt, assignments] of assignmentsByStatement) {
+    const iifeBody = getIifeBlockBody(stmt);
+
+    if (!iifeBody) {
+      // a bare `<requireFn>.X = value;` at the top level (WP4's flat shape).
+      // Reconstruct from the individual assignment node rather than cloning
+      // `stmt` wholesale - a minifier may have combined several assignments
+      // into one comma-sequenced statement, and only some of them may be
+      // self-contained.
+      for (const assignPath of assignments) {
+        if (isSelfContained(assignPath.get("right") as NodePath, requireFn)) {
+          result.push(
+            t.expressionStatement(t.cloneNode(assignPath.node, true))
+          );
+        }
+      }
+      continue;
+    }
+
+    const ownAssignmentStatements = new Set(
+      assignments
+        .map((p) => findEnclosingStatementIn(p, iifeBody))
+        .filter((s): s is t.Statement => s !== undefined)
+    );
+    const onlyPassiveDeclarationSiblings = iifeBody.every(
+      (s) =>
+        ownAssignmentStatements.has(s) ||
+        t.isVariableDeclaration(s) ||
+        t.isFunctionDeclaration(s)
+    );
+
+    if (onlyPassiveDeclarationSiblings) {
+      // safe to relocate the whole IIFE - its private sibling declarations
+      // (a cache, a small utility) travel with it, in their own scope
+      result.push(t.cloneNode(stmt, true));
+    } else {
+      // the wrapper has other, non-declaration statements (real eager side
+      // effects) we don't want to drag along - fall back to relocating only
+      // the individual assignments that are independently self-contained
+      for (const assignPath of assignments) {
+        if (isSelfContained(assignPath.get("right") as NodePath, requireFn)) {
+          result.push(
+            t.expressionStatement(t.cloneNode(assignPath.node, true))
+          );
+        }
+      }
     }
   }
 
-  if (!moduleMap) {
-    throw new Error(`Failed to locate module map in file ${newRuntime.path}`);
-  }
-
-  return { chunk: newRuntime, moduleMap };
+  return result;
 }
 
-export function createPatchedRuntimeChunk(
-  files: IterableIterator<FileNode>,
-  moduleMappingChunkName: string
-): PatchedRuntimeChunk {
-  const chunk = findRuntimeChunk(Array.from(files));
-  return patchRuntimeChunk(chunk, moduleMappingChunkName);
+/**
+ * Walks a (possibly multi-level, possibly computed) member expression chain
+ * down to its root and checks that root resolves to `requireFn` - i.e.
+ * whether `expr` is `<requireFn>.a.b.c...` for any depth/shape, not just one
+ * level deep.
+ */
+function isRootedAtRequireFn(
+  path: NodePath,
+  requireFn: IdentifiedFunctionDeclaration
+): boolean {
+  let current = path;
+  while (current.isMemberExpression()) {
+    current = current.get("object") as NodePath;
+  }
+  return current.isIdentifier() && referencesBinding(current, requireFn);
+}
+
+/**
+ * Whatever top-level statements remain once the require function
+ * declaration, module map declaration, helper property assignments and
+ * chunk-registration boilerplate (the `import * as X from "./chunk.js";
+ * <requireFn>.C(X);` pair used by `chunkFormat: "module"`) are accounted
+ * for. Only meaningful when no entry id was found anywhere in the bundle -
+ * see entry.ts shape B.
+ */
+function computeTrailingStatements(
+  ast: t.File,
+  requireFn: IdentifiedFunctionDeclaration,
+  body: readonly t.Statement[]
+): t.Statement[] {
+  const moduleMapDeclaration = body.find(
+    (stmt) =>
+      t.isVariableDeclaration(stmt) &&
+      stmt.declarations.some((d) => t.isObjectExpression(d.init))
+  );
+
+  const namespaceImportLocals = new Set<string>();
+  for (const stmt of body) {
+    if (t.isImportDeclaration(stmt)) {
+      for (const spec of stmt.specifiers) {
+        if (t.isImportNamespaceSpecifier(spec)) {
+          namespaceImportLocals.add(spec.local.name);
+        }
+      }
+    }
+  }
+
+  const boilerplate = new Set<t.Statement>();
+  function markBoilerplate(path: NodePath): void {
+    const stmt = findEnclosingStatementIn(path, body);
+    if (stmt) boilerplate.add(stmt);
+  }
+
+  traverse(ast, {
+    AssignmentExpression(path) {
+      const leftPath = path.get("left") as NodePath;
+      if (leftPath.isMemberExpression() && isRootedAtRequireFn(leftPath, requireFn)) {
+        markBoilerplate(path);
+      }
+    },
+    CallExpression(path) {
+      const calleePath = path.get("callee") as NodePath;
+      if (!calleePath.isMemberExpression()) return;
+      if (!isRootedAtRequireFn(calleePath, requireFn)) return;
+
+      const args = path.node.arguments;
+      const arg = args[0];
+      if (args.length === 1 && t.isIdentifier(arg) && namespaceImportLocals.has(arg.name)) {
+        markBoilerplate(path);
+      }
+    },
+  });
+
+  return body.filter((stmt) => {
+    if (stmt === (requireFn as t.Statement)) return false;
+    if (stmt === moduleMapDeclaration) return false;
+    // webpack's own compiled output never contains a literal `import` unless
+    // it's chunk-registration boilerplate for `chunkFormat: "module"` -
+    // source-level imports are always already compiled to require() calls.
+    if (t.isImportDeclaration(stmt)) return false;
+    if (boilerplate.has(stmt)) return false;
+    return true;
+  });
+}
+
+export function extractRuntimeChunk(file: FileNode): RuntimeChunkInfo {
+  const requireFn = findWebpackRequireFn(file);
+  const moduleMap = findRuntimeChunkModuleMap(file);
+  const topLevelBody = maybeUnwrapTopLevelIife(file.ast.program);
+  const helperStatements = collectHelperStatements(
+    file.ast,
+    requireFn,
+    topLevelBody
+  );
+  const entryId =
+    findShapeAEntryId(file.ast, requireFn) ??
+    findShapeCEntryId(file.ast, requireFn);
+  const trailingStatements =
+    entryId === undefined
+      ? computeTrailingStatements(file.ast, requireFn, topLevelBody)
+      : [];
+
+  return {
+    path: file.path,
+    requireFnName: requireFn.id.name,
+    moduleMap,
+    helperStatements,
+    entryId,
+    trailingStatements,
+  };
 }

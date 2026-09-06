@@ -1,4 +1,5 @@
 import * as t from "@babel/types";
+import type { NodePath } from "@babel/traverse";
 import type { FileNode } from "./types";
 
 export type AnyFunctionExpression =
@@ -74,6 +75,32 @@ export function isNormalMemberExpression(
     t.isMemberExpression(node, { computed: false }) &&
     t.isIdentifier(node.property)
   );
+}
+
+/** Strips all comments from `node` and its descendants in place - used to
+ * drop webpack's own module-boundary marker comments, which would otherwise
+ * leak into extracted module bodies once they're no longer sitting inside
+ * the original module-map/wrapper-function context. */
+/**
+ * Checks that `idPath` is a genuine reference resolving (via scope, not name
+ * string comparison) to `target`'s own binding. Minifiers routinely reuse
+ * short identifier names across unrelated scopes (e.g. a require function
+ * named `i` and, in a completely different nested closure, an unrelated
+ * local variable that also happens to be named `i`) - comparing names alone
+ * would conflate the two. This is the check that keeps them apart.
+ */
+export function referencesBinding(idPath: NodePath, target: t.Node): boolean {
+  if (!idPath.isReferencedIdentifier()) return false;
+  const binding = idPath.scope.getBinding(idPath.node.name);
+  return binding !== undefined && binding.path.node === target;
+}
+
+export function stripComments(node: t.Node): void {
+  t.traverseFast(node, (n) => {
+    n.leadingComments = null;
+    n.trailingComments = null;
+    n.innerComments = null;
+  });
 }
 
 export function cloneFileNode(node: FileNode): FileNode {

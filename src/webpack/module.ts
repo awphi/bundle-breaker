@@ -1,109 +1,112 @@
 import path from "path";
+import traverse from "@babel/traverse";
 import * as t from "@babel/types";
-import type { AnyFunctionExpression } from "../ast";
-import type { WebpackModuleMap } from "./types";
+import { stripComments, type AnyFunctionExpression } from "../ast";
 import type { FileNode } from "../types";
+import { applyRequireRewrite, SHIM_IDENTIFIER } from "./rewrite";
 
 const MODULES_DIR = "modules";
+export const ENTRY_PATH = "index.js";
+export const RUNTIME_SHIM_PATH: string = path.posix.join(
+  MODULES_DIR,
+  "__webpack_runtime.js"
+);
 
-export function createModuleMappingChunk(
-  oldToNew: Map<string, string>,
-  moduleMappingChunkName: string
+const PARAM_NAMES = ["module", "exports", "require"];
+
+/** Module ids can be plain numbers or short hashed strings - sanitize before
+ * using as a filename. */
+export function sanitizeModuleId(id: string): string {
+  const sanitized = id.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  return sanitized.length > 0 ? sanitized : "_";
+}
+
+export function modulePath(id: string): string {
+  return path.posix.join(MODULES_DIR, `${sanitizeModuleId(id)}.js`);
+}
+
+export function relativeRequirePath(fromPath: string, toPath: string): string {
+  const fromDir = path.posix.dirname(fromPath);
+  let rel = path.posix.relative(fromDir, toPath);
+  if (!rel.startsWith(".")) rel = "./" + rel;
+  return rel;
+}
+
+/**
+ * Positionally renames a webpack module function's params to
+ * `module`/`exports`/`require` (ignoring their original, possibly-minified
+ * names) and hoists its body to a flat statement list, ready to become a
+ * standalone file's Program body. Uses babel's own scope-aware rename so
+ * every reference (including in nested closures) is updated correctly, not
+ * just the declaration.
+ */
+function extractModuleBodyStatements(fn: AnyFunctionExpression): t.Statement[] {
+  const cloned = t.cloneNode(fn, true) as AnyFunctionExpression;
+  stripComments(cloned);
+  const wrapper = t.file(t.program([t.expressionStatement(cloned)]));
+
+  traverse(wrapper, {
+    Function(fnPath) {
+      if (fnPath.node !== cloned) return;
+      fnPath.node.params.forEach((param, i) => {
+        const newName = PARAM_NAMES[i];
+        if (newName && t.isIdentifier(param) && param.name !== newName) {
+          fnPath.scope.rename(param.name, newName);
+        }
+      });
+      fnPath.stop();
+    },
+  });
+
+  const body = cloned.body;
+  return t.isBlockStatement(body) ? body.body : [t.expressionStatement(body)];
+}
+
+function finalizeFile(
+  filePath: string,
+  bodyStatements: t.Statement[],
+  requireFnName: string,
+  resolveId: (id: string) => string | undefined
 ): FileNode {
-  // objects and arrays are indexed in the same way so just use an object for simplicity's sake
-  const moduleMapObjectExpr = t.objectExpression(
-    [...oldToNew.entries()].map(([originalId, newPath]) =>
-      t.objectProperty(t.stringLiteral(originalId), t.stringLiteral(newPath))
-    )
-  );
+  const file = t.file(t.program(bodyStatements));
+  const { usesShim } = applyRequireRewrite(file, requireFnName, resolveId);
 
-  const moduleMappingAst = t.file(
-    t.program([
-      t.expressionStatement(
-        t.assignmentExpression(
-          "=",
-          t.memberExpression(t.identifier("module"), t.identifier("exports")),
-          moduleMapObjectExpr
-        )
-      ),
-    ])
-  );
-
-  return {
-    ast: moduleMappingAst,
-    path: moduleMappingChunkName,
-  };
-}
-
-function createFileForModule(
-  sourcePath: string,
-  moduleId: string,
-  moduleFn: AnyFunctionExpression
-): FileNode {
-  const clonedModuleFn = t.cloneNode(moduleFn, false);
-  clonedModuleFn.leadingComments = [];
-
-  const ast = t.file(
-    t.program([
-      t.expressionStatement(
-        t.assignmentExpression(
-          "=",
-          t.memberExpression(t.identifier("module"), t.identifier("exports")),
-          clonedModuleFn
-        )
-      ),
-    ])
-  );
-  t.addComment(
-    ast,
-    "leading",
-    `Original module ID: '${moduleId}', source: '${sourcePath}'`
-  );
-
-  return {
-    ast,
-    path: path.join(MODULES_DIR, `${moduleId}${path.extname(sourcePath)}`),
-  };
-}
-
-export function updateRequireCalls(
-  ast: t.File,
-  oldToNew: Map<string, string>
-): void {
-  // TODO implement this function to update require calls in the AST based on the provided module map
-  // This will involve traversing the AST and replacing require calls with the corresponding paths from the module map
-  // basically a mirror of updateNamesInternal
-}
-
-export function createModuleFilesFromMaps(
-  moduleMaps: Map<string, WebpackModuleMap>,
-  moduleMappingChunkName: string
-): Map<string, FileNode> {
-  const files = new Map<string, FileNode>();
-  const oldToNew = new Map<string, string>();
-
-  for (const [chunkPath, { moduleFns }] of moduleMaps.entries()) {
-    for (const [moduleId, moduleFn] of moduleFns.entries()) {
-      if (oldToNew.has(moduleId)) {
-        throw new Error(
-          `Encountered module ID clash '${moduleId}' - found in ${oldToNew.get(
-            moduleId
-          )} and ${chunkPath}.`
-        );
-      }
-
-      const module = createFileForModule(chunkPath, moduleId, moduleFn);
-      files.set(module.path, module);
-      oldToNew.set(moduleId, module.path);
-    }
+  if (usesShim) {
+    const shimRequirePath = relativeRequirePath(filePath, RUNTIME_SHIM_PATH);
+    file.program.body.unshift(
+      t.variableDeclaration("const", [
+        t.variableDeclarator(
+          t.identifier(SHIM_IDENTIFIER),
+          t.callExpression(t.identifier("require"), [
+            t.stringLiteral(shimRequirePath),
+          ])
+        ),
+      ])
+    );
   }
 
-  for (const module of files.values()) {
-    updateRequireCalls(module.ast, oldToNew);
-  }
+  return { path: filePath, ast: file };
+}
 
-  const mapping = createModuleMappingChunk(oldToNew, moduleMappingChunkName);
-  files.set(mapping.path, mapping);
+/** Builds a regular module file (`index.js` or `modules/<id>.js`) from its
+ * original webpack module function. */
+export function buildModuleFile(
+  fn: AnyFunctionExpression,
+  filePath: string,
+  resolveId: (id: string) => string | undefined
+): FileNode {
+  const bodyStatements = extractModuleBodyStatements(fn);
+  return finalizeFile(filePath, bodyStatements, "require", resolveId);
+}
 
-  return files;
+/** Builds `index.js` from the runtime chunk's own leftover top-level
+ * statements, for bundles with no numbered entry module at all (shape B). */
+export function buildEntryFileFromTrailingStatements(
+  statements: readonly t.Statement[],
+  requireFnName: string,
+  resolveId: (id: string) => string | undefined
+): FileNode {
+  const cloned = statements.map((stmt) => t.cloneNode(stmt, true));
+  cloned.forEach(stripComments);
+  return finalizeFile(ENTRY_PATH, cloned, requireFnName, resolveId);
 }

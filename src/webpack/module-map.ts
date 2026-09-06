@@ -56,3 +56,25 @@ export function makeModuleMap(expr?: t.Node): WebpackModuleMap {
     `Cannot construct module map from node of type ${expr?.type}`
   );
 }
+
+/**
+ * Like `makeModuleMap`, but never throws - returns undefined if `expr` isn't
+ * an object/array expression, or if it doesn't contain any module functions.
+ * Used to trial-parse candidate expressions when we don't yet know which one
+ * (if any) is the real module map, matched by content rather than by which
+ * declaration/property name webpack happened to wrap it in.
+ */
+export function tryMakeModuleMap(
+  expr: t.Node | null | undefined
+): WebpackModuleMap | undefined {
+  if (!t.isObjectExpression(expr) && !t.isArrayExpression(expr)) {
+    return undefined;
+  }
+
+  try {
+    const map = makeModuleMap(expr);
+    return map.moduleFns.size > 0 ? map : undefined;
+  } catch {
+    return undefined;
+  }
+}

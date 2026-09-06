@@ -1,79 +1,116 @@
+import type { AnyFunctionExpression } from "../ast";
 import type { Bundle, FileNode, RawBundle } from "../types";
-import { createStrippedAdditionalChunk } from "./additional-chunks";
-import type { WebpackModuleMap } from "./types";
-import { createPatchedRuntimeChunk } from "./runtime-chunk";
-import { createModuleFilesFromMaps, updateRequireCalls } from "./module";
+import { extractAdditionalChunk } from "./additional-chunks";
+import {
+  buildEntryFileFromTrailingStatements,
+  buildModuleFile,
+  ENTRY_PATH,
+  modulePath,
+  relativeRequirePath,
+  RUNTIME_SHIM_PATH,
+} from "./module";
+import { createRuntimeShimFile } from "./runtime-shim";
+import { extractRuntimeChunk, findRuntimeChunk } from "./runtime-chunk";
 
 export const name = "webpack";
-const MODULE_MAPPING_CHUNK_NAME = "module_mapping.js";
 
 export function detect(bundle: RawBundle): number {
-  // TODO
-  return 1;
-}
-
-export function rename(
-  bundle: Bundle,
-  renames: ReadonlyMap<string, string>
-): Bundle {
-  const files = new Map(bundle.files.entries());
-  const oldToNew = new Map<string, string>();
-  const seenNewNames = new Set<string>();
-
-  for (const [id, file] of files.entries()) {
-    const newName = renames.get(id);
-    if (!newName) {
-      continue;
-    }
-    if (seenNewNames.has(newName)) {
-      throw new Error(
-        `Duplicate new name: ${newName}. New file names must be unique.`
-      );
-    }
-    seenNewNames.add(newName);
-    files.set(id, { ...file, path: newName });
-    oldToNew.set(file.path, newName);
+  try {
+    findRuntimeChunk([...bundle.files.values()]);
+    return 1;
+  } catch {
+    return 0;
   }
-
-  for (const file of files.values()) {
-    updateRequireCalls(file.ast, oldToNew);
-  }
-
-  return { ...bundle, files };
 }
 
 export function split(bundle: RawBundle): Bundle {
-  const runtime = createPatchedRuntimeChunk(
-    bundle.files.values(),
-    MODULE_MAPPING_CHUNK_NAME
+  const files = [...bundle.files.values()];
+  const runtimeChunkFile = findRuntimeChunk(files);
+  const runtimeInfo = extractRuntimeChunk(runtimeChunkFile);
+
+  const moduleFns = new Map<string, AnyFunctionExpression>(
+    runtimeInfo.moduleMap.moduleFns
   );
+  let entryId = runtimeInfo.entryId;
 
-  const moduleMaps = new Map<string, WebpackModuleMap>();
-  moduleMaps.set(runtime.chunk.path, runtime.moduleMap);
+  for (const file of files) {
+    if (file.path === runtimeChunkFile.path) continue;
 
-  const files = new Map<string, FileNode>();
-  files.set(runtime.chunk.path, runtime.chunk);
+    const additional = extractAdditionalChunk(file);
+    if (!additional) continue;
 
-  for (const [path, chunk] of bundle.files) {
-    if (path === runtime.chunk.path) {
-      continue;
+    for (const [id, fn] of additional.moduleMap.moduleFns) {
+      if (moduleFns.has(id)) {
+        throw new Error(
+          `Encountered module ID clash '${id}' while merging chunk ${file.path}`
+        );
+      }
+      moduleFns.set(id, fn);
     }
 
-    const stripped = createStrippedAdditionalChunk(chunk);
-    moduleMaps.set(path, stripped.moduleMap);
-    files.set(stripped.chunk.path, stripped.chunk);
+    if (additional.entryId !== undefined) {
+      if (entryId !== undefined && entryId !== additional.entryId) {
+        throw new Error(
+          `Found multiple candidate entry ids: '${entryId}' and '${additional.entryId}'`
+        );
+      }
+      entryId = additional.entryId;
+    }
   }
 
-  const moduleFiles = createModuleFilesFromMaps(
-    moduleMaps,
-    MODULE_MAPPING_CHUNK_NAME
+  if (entryId !== undefined && !moduleFns.has(entryId)) {
+    throw new Error(
+      `Detected entry id '${entryId}' but no module with that id was found`
+    );
+  }
+
+  const usingTrailingStatements = entryId === undefined;
+  if (usingTrailingStatements && runtimeInfo.trailingStatements.length === 0) {
+    throw new Error(
+      `Failed to find an entry point anywhere in the bundle (file: ${runtimeChunkFile.path})`
+    );
+  }
+
+  const idToPath = new Map<string, string>();
+  for (const id of moduleFns.keys()) {
+    idToPath.set(id, id === entryId ? ENTRY_PATH : modulePath(id));
+  }
+
+  function makeResolveId(fromPath: string): (id: string) => string | undefined {
+    return (id) => {
+      const targetPath = idToPath.get(id);
+      return targetPath ? relativeRequirePath(fromPath, targetPath) : undefined;
+    };
+  }
+
+  const outFiles = new Map<string, FileNode>();
+
+  for (const [id, fn] of moduleFns) {
+    const filePath = idToPath.get(id)!;
+    const file = buildModuleFile(fn, filePath, makeResolveId(filePath));
+    outFiles.set(file.path, file);
+  }
+
+  if (usingTrailingStatements) {
+    const file = buildEntryFileFromTrailingStatements(
+      runtimeInfo.trailingStatements,
+      runtimeInfo.requireFnName,
+      makeResolveId(ENTRY_PATH)
+    );
+    outFiles.set(file.path, file);
+  }
+
+  const shimIdToPath = new Map<string, string>();
+  for (const [id, targetPath] of idToPath) {
+    shimIdToPath.set(id, relativeRequirePath(RUNTIME_SHIM_PATH, targetPath));
+  }
+  const shimFile = createRuntimeShimFile(
+    runtimeInfo.helperStatements,
+    runtimeInfo.requireFnName,
+    shimIdToPath,
+    RUNTIME_SHIM_PATH
   );
-  for (const [path, file] of moduleFiles) {
-    files.set(path, file);
-  }
+  outFiles.set(shimFile.path, shimFile);
 
-  return {
-    adapter: name,
-    files,
-  };
+  return { adapter: name, files: outFiles };
 }
