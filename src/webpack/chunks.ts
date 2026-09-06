@@ -11,9 +11,9 @@ import type { FileNode } from "../types";
 import type {
   AdditionalChunkInfo,
   RuntimeChunkInfo,
-  WebpackModuleMap,
+  ModuleFnMap,
 } from "./types";
-import { makeModuleMap, tryMakeModuleMap } from "./module-map";
+import { getJsonpPushedArray, makeModuleMap, tryMakeModuleMap } from "./module-map";
 import { findEntryIdInAdditionalChunk, findEntryIdInRuntimeChunk, findEntryTrailingCode } from "./entry";
 import { findRelocatableHelperStatements } from "./helpers";
 
@@ -61,7 +61,7 @@ function findRequireFunction({
 
 function findModuleMapFromIifeArgument(
   program: t.Program
-): WebpackModuleMap | undefined {
+): ModuleFnMap | undefined {
   const iife = getIifeCallExpression(program.body[0]);
   if (program.body.length === 1 && iife && iife.arguments.length === 1) {
     return makeModuleMap(iife.arguments[0]);
@@ -71,7 +71,7 @@ function findModuleMapFromIifeArgument(
 
 function findModuleMapFromVariableDeclaration(
   body: readonly t.Statement[]
-): WebpackModuleMap | undefined {
+): ModuleFnMap | undefined {
   const firstVariableDec = body.find((v) => t.isVariableDeclaration(v));
   for (const declarator of firstVariableDec?.declarations ?? []) {
     if (t.isObjectExpression(declarator.init)) {
@@ -84,7 +84,7 @@ function findModuleMapFromVariableDeclaration(
 function findModuleMapInRuntimeChunk({
   ast,
   path,
-}: FileNode): WebpackModuleMap {
+}: FileNode): ModuleFnMap {
   const moduleMap =
     findModuleMapFromIifeArgument(ast.program) ??
     findModuleMapFromVariableDeclaration(maybeUnwrapTopLevelIife(ast.program));
@@ -115,13 +115,13 @@ export function findRuntimeChunkFile(files: readonly FileNode[]): FileNode {
 
 export function readRuntimeChunk(file: FileNode): RuntimeChunkInfo {
   const requireFn = findRequireFunction(file);
-  const moduleMap = findModuleMapInRuntimeChunk(file);
+  const moduleFns = findModuleMapInRuntimeChunk(file);
   const topLevelBody = maybeUnwrapTopLevelIife(file.ast.program);
 
   return {
     path: file.path,
     requireFnName: requireFn.id.name,
-    moduleMap,
+    moduleFns,
     relocatableHelperStatements: findRelocatableHelperStatements(
       file.ast,
       requireFn,
@@ -137,28 +137,18 @@ function findModuleMapCandidates(program: t.Program): t.Expression[] {
   const candidates: t.Expression[] = [];
 
   for (const stmt of program.body) {
-    if (t.isExpressionStatement(stmt)) {
-      const expr = stmt.expression;
+    if (
+      t.isExpressionStatement(stmt) &&
+      t.isAssignmentExpression(stmt.expression) &&
+      stmt.expression.operator === "=" &&
+      isNormalMemberExpression(stmt.expression.left)
+    ) {
+      candidates.push(stmt.expression.right);
+    }
 
-      if (
-        t.isAssignmentExpression(expr) &&
-        expr.operator === "=" &&
-        isNormalMemberExpression(expr.left)
-      ) {
-        candidates.push(expr.right);
-      }
-
-      if (
-        t.isCallExpression(expr) &&
-        isNormalMemberExpression(expr.callee) &&
-        t.isIdentifier(expr.callee.property, { name: "push" }) &&
-        expr.arguments.length === 1 &&
-        t.isArrayExpression(expr.arguments[0])
-      ) {
-        for (const el of expr.arguments[0].elements) {
-          if (el && t.isExpression(el)) candidates.push(el);
-        }
-      }
+    const pushed = getJsonpPushedArray(stmt);
+    for (const el of pushed?.elements ?? []) {
+      if (el && t.isExpression(el)) candidates.push(el);
     }
 
     if (
@@ -179,23 +169,23 @@ export function readAdditionalChunk(
 ): AdditionalChunkInfo | undefined {
   const candidates = findModuleMapCandidates(chunk.ast.program);
 
-  let moduleMap: WebpackModuleMap | undefined;
+  let moduleFns: ModuleFnMap | undefined;
   for (const candidate of candidates) {
     const map = tryMakeModuleMap(candidate);
     if (!map) continue;
-    if (moduleMap) {
+    if (moduleFns) {
       throw new Error(
         `Found multiple candidate module maps in chunk ${chunk.path}`
       );
     }
-    moduleMap = map;
+    moduleFns = map;
   }
 
-  if (!moduleMap) return undefined;
+  if (!moduleFns) return undefined;
 
   return {
     path: chunk.path,
-    moduleMap,
+    moduleFns,
     entryId: findEntryIdInAdditionalChunk(chunk.ast.program),
   };
 }

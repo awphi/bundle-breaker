@@ -5,15 +5,10 @@ import {
   findEnclosingStatementAmong,
   isNormalMemberExpression,
   isSameBinding,
+  literalId,
   type IdentifiedFunctionDeclaration,
 } from "../ast";
-
-function literalId(node: t.Node | null | undefined): string | undefined {
-  if (node && (t.isStringLiteral(node) || t.isNumericLiteral(node))) {
-    return String(node.value);
-  }
-  return undefined;
-}
+import { getJsonpPushedArray } from "./module-map";
 
 function extractRequireCallId(
   callPath: NodePath,
@@ -27,6 +22,17 @@ function extractRequireCallId(
     return undefined;
   }
   return literalId(callPath.node.arguments[0]);
+}
+
+function isMemberChainRootedAtRequireFn(
+  path: NodePath,
+  requireFn: IdentifiedFunctionDeclaration
+): boolean {
+  let current = path;
+  while (current.isMemberExpression()) {
+    current = current.get("object") as NodePath;
+  }
+  return current.isIdentifier() && isSameBinding(current, requireFn);
 }
 
 function findEntryCallWithSelfAssignedArg(
@@ -72,8 +78,7 @@ function findEntryCallInDeferredCallback(
 
       const calleePath = path.get("callee") as NodePath;
       if (!calleePath.isMemberExpression()) return;
-      const objPath = calleePath.get("object") as NodePath;
-      if (!objPath.isIdentifier() || !isSameBinding(objPath, requireFn)) return;
+      if (!isMemberChainRootedAtRequireFn(calleePath, requireFn)) return;
 
       for (const argPath of path.get("arguments") as NodePath[]) {
         if (found) break;
@@ -113,21 +118,9 @@ export function findEntryIdInAdditionalChunk(
   program: t.Program
 ): string | undefined {
   for (const stmt of program.body) {
-    if (!t.isExpressionStatement(stmt) || !t.isCallExpression(stmt.expression))
-      continue;
+    const pushed = getJsonpPushedArray(stmt);
+    if (!pushed) continue;
 
-    const call = stmt.expression;
-    const callee = call.callee;
-    if (
-      !isNormalMemberExpression(callee) ||
-      !t.isIdentifier(callee.property, { name: "push" }) ||
-      call.arguments.length !== 1 ||
-      !t.isArrayExpression(call.arguments[0])
-    ) {
-      continue;
-    }
-
-    const pushed = call.arguments[0];
     const deferredTable = pushed.elements[2];
     if (!deferredTable || !t.isArrayExpression(deferredTable)) continue;
 
@@ -139,17 +132,6 @@ export function findEntryIdInAdditionalChunk(
   }
 
   return undefined;
-}
-
-function isMemberChainRootedAtRequireFn(
-  path: NodePath,
-  requireFn: IdentifiedFunctionDeclaration
-): boolean {
-  let current = path;
-  while (current.isMemberExpression()) {
-    current = current.get("object") as NodePath;
-  }
-  return current.isIdentifier() && isSameBinding(current, requireFn);
 }
 
 export function findEntryTrailingCode(

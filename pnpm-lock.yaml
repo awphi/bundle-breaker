@@ -14,6 +14,9 @@ importers:
       '@babel/parser':
         specifier: ^8.0.4
         version: 8.0.4
+      '@babel/template':
+        specifier: ^8.0.0
+        version: 8.0.0
       '@babel/traverse':
         specifier: ^8.0.4
         version: 8.0.4

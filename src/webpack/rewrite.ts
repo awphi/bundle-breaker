@@ -1,12 +1,6 @@
 import traverse from "@babel/traverse";
 import * as t from "@babel/types";
-
-function literalId(node: t.Node | null | undefined): string | undefined {
-  if (node && (t.isStringLiteral(node) || t.isNumericLiteral(node))) {
-    return String(node.value);
-  }
-  return undefined;
-}
+import { literalId } from "../ast";
 
 export function rewriteRequireCalls(
   file: t.File,

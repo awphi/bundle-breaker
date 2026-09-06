@@ -1,7 +1,8 @@
 import path from "path";
 import traverse from "@babel/traverse";
+import template from "@babel/template";
 import * as t from "@babel/types";
-import { stripComments, type AnyFunctionExpression } from "../ast";
+import { stripComments, wrapForTraversal, type AnyFunctionExpression } from "../ast";
 import type { FileNode } from "../types";
 import { rewriteRequireCalls } from "./rewrite";
 
@@ -14,7 +15,7 @@ export const RUNTIME_SHIM_PATH: string = path.posix.join(
 
 const MODULE_PARAM_NAMES = ["module", "exports", "require"];
 
-export function sanitizeModuleId(id: string): string {
+function sanitizeModuleId(id: string): string {
   const sanitized = id.replace(/[^a-zA-Z0-9_.-]/g, "_");
   return sanitized.length > 0 ? sanitized : "_";
 }
@@ -31,7 +32,7 @@ export function relativeRequirePath(fromPath: string, toPath: string): string {
 }
 
 function renameParamsPositionally(fn: AnyFunctionExpression): void {
-  const wrapper = t.file(t.program([t.expressionStatement(fn)]));
+  const wrapper = wrapForTraversal(t.expressionStatement(fn));
   traverse(wrapper, {
     Function(fnPath) {
       if (fnPath.node !== fn) return;
@@ -93,9 +94,8 @@ function renameToShimFunction(
 ): t.Statement {
   const cloned = t.cloneNode(stmt, true);
   stripComments(cloned);
-  const wrapper = t.file(t.program([cloned]));
 
-  traverse(wrapper, {
+  traverse(wrapForTraversal(cloned), {
     Identifier(path) {
       if (path.node.name === requireFnName && path.isReferencedIdentifier()) {
         path.node.name = SHIM_FUNCTION_NAME;
@@ -105,6 +105,16 @@ function renameToShimFunction(
 
   return cloned;
 }
+
+const buildShimPrelude = template.statements(`
+  const ID_TO_PATH = %%idToPathTable%%;
+  function %%shimName%%(id) {
+    const resolved = ID_TO_PATH[id];
+    if (resolved === undefined) throw new Error("Unknown webpack module id: " + id);
+    return require(resolved);
+  }
+  module.exports = %%shimName%%;
+`);
 
 export function createRuntimeShimFile(
   helperStatements: readonly t.Statement[],
@@ -117,54 +127,17 @@ export function createRuntimeShimFile(
       t.objectProperty(t.stringLiteral(id), t.stringLiteral(relativePath))
     )
   );
+  const shimName = t.identifier(SHIM_FUNCTION_NAME);
+  const [idToPathDecl, shimFn, exportStmt] = buildShimPrelude({
+    idToPathTable,
+    shimName,
+  });
 
-  const statements: t.Statement[] = [
-    t.variableDeclaration("const", [
-      t.variableDeclarator(t.identifier("ID_TO_PATH"), idToPathTable),
-    ]),
-    t.functionDeclaration(
-      t.identifier(SHIM_FUNCTION_NAME),
-      [t.identifier("id")],
-      t.blockStatement([
-        t.variableDeclaration("const", [
-          t.variableDeclarator(
-            t.identifier("resolved"),
-            t.memberExpression(
-              t.identifier("ID_TO_PATH"),
-              t.identifier("id"),
-              true
-            )
-          ),
-        ]),
-        t.ifStatement(
-          t.binaryExpression(
-            "===",
-            t.identifier("resolved"),
-            t.identifier("undefined")
-          ),
-          t.throwStatement(
-            t.newExpression(t.identifier("Error"), [
-              t.binaryExpression(
-                "+",
-                t.stringLiteral("Unknown webpack module id: "),
-                t.identifier("id")
-              ),
-            ])
-          )
-        ),
-        t.returnStatement(
-          t.callExpression(t.identifier("require"), [t.identifier("resolved")])
-        ),
-      ])
-    ),
+  const statements = [
+    idToPathDecl,
+    shimFn,
     ...helperStatements.map((stmt) => renameToShimFunction(stmt, requireFnName)),
-    t.expressionStatement(
-      t.assignmentExpression(
-        "=",
-        t.memberExpression(t.identifier("module"), t.identifier("exports")),
-        t.identifier(SHIM_FUNCTION_NAME)
-      )
-    ),
+    exportStmt,
   ];
 
   return { path: shimPath, ast: t.file(t.program(statements)) };

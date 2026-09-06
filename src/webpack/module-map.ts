@@ -1,9 +1,31 @@
-import type { WebpackModuleMap } from "./types";
+import type { ModuleFnMap } from "./types";
 import type { AnyFunctionExpression } from "../ast";
 import * as t from "@babel/types";
-import { extractObjectMethodFunction, isAnyFunctionExpression } from "../ast";
+import {
+  extractObjectMethodFunction,
+  isAnyFunctionExpression,
+  isNormalMemberExpression,
+} from "../ast";
 
-function makeModuleMapFromObject(expr: t.ObjectExpression): WebpackModuleMap {
+export function getJsonpPushedArray(
+  stmt: t.Statement
+): t.ArrayExpression | undefined {
+  if (!t.isExpressionStatement(stmt) || !t.isCallExpression(stmt.expression)) {
+    return undefined;
+  }
+  const { callee, arguments: args } = stmt.expression;
+  if (
+    !isNormalMemberExpression(callee) ||
+    !t.isIdentifier(callee.property, { name: "push" }) ||
+    args.length !== 1 ||
+    !t.isArrayExpression(args[0])
+  ) {
+    return undefined;
+  }
+  return args[0];
+}
+
+function makeModuleMapFromObject(expr: t.ObjectExpression): ModuleFnMap {
   const moduleFns = new Map<string, AnyFunctionExpression>();
   for (const prop of expr.properties) {
     if (t.isSpreadElement(prop)) {
@@ -25,10 +47,10 @@ function makeModuleMapFromObject(expr: t.ObjectExpression): WebpackModuleMap {
     }
   }
 
-  return { expression: expr, moduleFns };
+  return moduleFns;
 }
 
-function makeModuleMapFromArray(expr: t.ArrayExpression): WebpackModuleMap {
+function makeModuleMapFromArray(expr: t.ArrayExpression): ModuleFnMap {
   const moduleFns = new Map<string, AnyFunctionExpression>();
   for (let i = 0; i < expr.elements.length; i++) {
     const fn = expr.elements[i];
@@ -37,10 +59,10 @@ function makeModuleMapFromArray(expr: t.ArrayExpression): WebpackModuleMap {
     }
   }
 
-  return { expression: expr, moduleFns };
+  return moduleFns;
 }
 
-export function makeModuleMap(expr?: t.Node): WebpackModuleMap {
+export function makeModuleMap(expr?: t.Node): ModuleFnMap {
   if (t.isObjectExpression(expr)) {
     return makeModuleMapFromObject(expr);
   }
@@ -56,14 +78,14 @@ export function makeModuleMap(expr?: t.Node): WebpackModuleMap {
 
 export function tryMakeModuleMap(
   expr: t.Node | null | undefined
-): WebpackModuleMap | undefined {
+): ModuleFnMap | undefined {
   if (!t.isObjectExpression(expr) && !t.isArrayExpression(expr)) {
     return undefined;
   }
 
   try {
     const map = makeModuleMap(expr);
-    return map.moduleFns.size > 0 ? map : undefined;
+    return map.size > 0 ? map : undefined;
   } catch {
     return undefined;
   }

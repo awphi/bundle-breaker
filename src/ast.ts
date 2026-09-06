@@ -1,6 +1,5 @@
 import * as t from "@babel/types";
 import type { NodePath } from "@babel/traverse";
-import type { FileNode } from "./types";
 
 export type AnyFunctionExpression =
   | t.ArrowFunctionExpression
@@ -77,6 +76,13 @@ export function isNormalMemberExpression(
   );
 }
 
+export function literalId(node: t.Node | null | undefined): string | undefined {
+  if (node && (t.isStringLiteral(node) || t.isNumericLiteral(node))) {
+    return String(node.value);
+  }
+  return undefined;
+}
+
 export function isSameBinding(idPath: NodePath, target: t.Node): boolean {
   if (!idPath.isReferencedIdentifier()) return false;
   const binding = idPath.scope.getBinding(idPath.node.name);
@@ -101,17 +107,14 @@ export function findEnclosingStatementAmong(
   return stmtPath ? (stmtPath.node as t.Statement) : undefined;
 }
 
+export function wrapForTraversal(stmt: t.Statement): t.File {
+  return t.file(t.program([stmt]));
+}
+
 export function getNoArgIifeBody(stmt: t.Statement): t.Statement[] | undefined {
   const iife = getIifeCallExpression(stmt);
   if (iife && iife.arguments.length === 0 && t.isBlockStatement(iife.callee.body)) {
     return iife.callee.body.body;
   }
   return undefined;
-}
-
-export function cloneFileNode(node: FileNode): FileNode {
-  return {
-    path: node.path,
-    ast: t.cloneNode(node.ast, true),
-  };
 }

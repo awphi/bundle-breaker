@@ -29,7 +29,7 @@ export function split(bundle: RawBundle): Bundle {
   const runtimeInfo = readRuntimeChunk(runtimeChunkFile);
 
   const moduleFns = new Map<string, AnyFunctionExpression>(
-    runtimeInfo.moduleMap.moduleFns
+    runtimeInfo.moduleFns
   );
   let entryId = runtimeInfo.entryId;
 
@@ -39,7 +39,7 @@ export function split(bundle: RawBundle): Bundle {
     const additional = readAdditionalChunk(file);
     if (!additional) continue;
 
-    for (const [id, fn] of additional.moduleMap.moduleFns) {
+    for (const [id, fn] of additional.moduleFns) {
       if (moduleFns.has(id)) {
         throw new Error(
           `Encountered module ID clash '${id}' while merging chunk ${file.path}`
