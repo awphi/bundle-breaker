@@ -11,8 +11,8 @@ function log(message: string): void {
   console.log(`${timestamp()} ${message}`);
 }
 
-// TODO be a better behaved CLI tool - only log to stderr, something useful in stdout, log-level
-// TODO CLI nice-to-haves - e.g. clear output directory
+// TODO be a better behaved CLI tool - only log to stderr, something useful in stdout, log-level, colors?
+// TODO CLI nice-to-haves - e.g. clear output directory, types for options
 program
   .name(name)
   .description(description)

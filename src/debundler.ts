@@ -6,7 +6,6 @@ export interface Debundler {
   split(bundle: RawBundle): Bundle;
 }
 
-// TODO test
 export function findDebundler(
   bundle: RawBundle,
   debundlers: Debundler[]

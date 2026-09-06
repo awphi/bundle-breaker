@@ -9,7 +9,6 @@ import generate from "@babel/generator";
 
 const DEBUNDLERS: Debundler[] = [webpack];
 
-// TODO test
 export async function read(input: string): Promise<Record<string, string>> {
   const paths = await fs.readdir(input, { recursive: true });
 
@@ -26,7 +25,6 @@ export async function read(input: string): Promise<Record<string, string>> {
   return files;
 }
 
-// TODO test
 export async function save(out: string, bundle: Bundle): Promise<void> {
   await Promise.all(
     [...bundle.files.values()].map(async (file) => {
