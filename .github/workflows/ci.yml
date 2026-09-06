@@ -22,7 +22,5 @@ jobs:
       run: pnpm install
     - name: Build lib
       run: pnpm build
-    - name: Build examples
-      run: pnpm examples:build-all
     - name: Test
       run: pnpm test

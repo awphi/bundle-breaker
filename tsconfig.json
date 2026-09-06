@@ -17,5 +17,5 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["src", "scripts"]
+  "include": ["src", "scripts", "e2e"]
 }

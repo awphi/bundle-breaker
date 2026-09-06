@@ -21,9 +21,7 @@
     "dev": "pnpm build --watch",
     "prepack": "pnpm build",
     "build": "tsdown",
-    "test": "vitest run",
-    "examples:build-all": "node ./scripts/build-examples.ts build-all",
-    "examples:build": "node ./scripts/build-examples.ts build"
+    "test": "vitest run"
   },
   "author": "awphi (adamw.ph)",
   "license": "GPL-3.0-only",
@@ -39,7 +37,9 @@
     "picocolors": "^1.0.1"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.14.0",
     "@types/node": "24.11.1",
+    "happy-dom": "^20.14.0",
     "tsdown": "^0.22.14",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"

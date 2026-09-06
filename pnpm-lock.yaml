@@ -36,9 +36,15 @@ importers:
         specifier: ^1.0.1
         version: 1.1.1
     devDependencies:
+      '@happy-dom/global-registrator':
+        specifier: ^20.14.0
+        version: 20.14.0
       '@types/node':
         specifier: 24.11.1
         version: 24.11.1
+      happy-dom:
+        specifier: ^20.14.0
+        version: 20.14.0
       tsdown:
         specifier: ^0.22.14
         version: 0.22.14(typescript@7.0.2)
@@ -47,9 +53,9 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^4.1.11
-        version: 4.1.11(@types/node@24.11.1)(vite@8.2.2(@types/node@24.11.1)(terser@5.50.0))
+        version: 4.1.11(@types/node@24.11.1)(happy-dom@20.14.0)(vite@8.2.2(@types/node@24.11.1)(terser@5.50.0))
 
-  examples/webpack4_47-simple:
+  e2e/examples/webpack4_47-simple:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -67,7 +73,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack4_47-splitchunks:
+  e2e/examples/webpack4_47-splitchunks:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -85,7 +91,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack4_47-splitchunks-hashed-ids:
+  e2e/examples/webpack4_47-splitchunks-hashed-ids:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -103,7 +109,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack4_47-terser:
+  e2e/examples/webpack4_47-terser:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -124,7 +130,7 @@ importers:
         specifier: 4.10.0
         version: 4.10.0(webpack@4.47.0)
 
-  examples/webpack5_109-complex:
+  e2e/examples/webpack5_109-complex-dom:
     devDependencies:
       '@babel/preset-env':
         specifier: ^7.24.5
@@ -178,7 +184,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_109-simple-iife:
+  e2e/examples/webpack5_109-simple-iife:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -193,7 +199,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_109-simple-no-iife:
+  e2e/examples/webpack5_109-simple-no-iife:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -208,7 +214,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_109-splitchunks:
+  e2e/examples/webpack5_109-splitchunks:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -223,7 +229,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_109-splitchunks-cjs:
+  e2e/examples/webpack5_109-splitchunks-cjs:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -238,7 +244,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_109-splitchunks-hashed-ids:
+  e2e/examples/webpack5_109-splitchunks-hashed-ids:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -253,7 +259,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_109-splitchunks-mjs:
+  e2e/examples/webpack5_109-splitchunks-mjs:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -268,7 +274,7 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
-  examples/webpack5_91-terser:
+  e2e/examples/webpack5_91-terser:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5
@@ -1009,6 +1015,10 @@ packages:
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
 
+  '@happy-dom/global-registrator@20.14.0':
+    resolution: {integrity: sha512-Xn0kdkaA1eHOaFFopr+YQ37sPNTZ3JScpUMz3j4rIsn1Nneqoh94z79iW23Ej0Ytt99+LlFr4JrSDd6ow9c7MQ==}
+    engines: {node: '>=20.0.0'}
+
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
 
@@ -1177,6 +1187,12 @@ packages:
 
   '@types/node@24.11.1':
     resolution: {integrity: sha512-MOw3rIVR4djfMH7ft9ZJLPViaJwkZvMfrzumElas79IwMUEl8ykkuQmgL9MAMz7vO8G3vuz9b7Gu+keYZx7Xrw==}
+
+  '@types/whatwg-mimetype@3.0.2':
+    resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     resolution: {integrity: sha512-MTKKkWB7p/0E9xi1d1tHtZ5PiLkGEMIq88pK2CubZjOsLtYTLqhgIgi6zepFa+9GHZ6h05NMCkQxGKiPXMxXtQ==}
@@ -1852,6 +1868,10 @@ packages:
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
 
+  buffer-image-size@0.6.4:
+    resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
+    engines: {node: '>=4.0'}
+
   buffer-xor@1.0.3:
     resolution: {integrity: sha512-571s0T7nZWK6vB67HI5dyUF7wXiNcfaPPPTl6zYCNApANjIvYJTg7hlud/+cJpdAhS7dVzqMLmfhfHR3rAcOjQ==}
 
@@ -2180,6 +2200,10 @@ packages:
   entities@2.2.0:
     resolution: {integrity: sha512-p92if5Nz619I0w+akJrLZH0MX0Pb5DX39XOwQTtXSdQQOaYH03S1uIQp4mhOZtAXrxq4ViO67YTiLBo2638o9A==}
 
+  entities@7.0.1:
+    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
+    engines: {node: '>=0.12'}
+
   envinfo@7.21.0:
     resolution: {integrity: sha512-Lw7I8Zp5YKHFCXL7+Dz95g4CcbMEpgvqZNNq3AmlT5XAV6CgAAk6gyAMqn2zjw08K9BHfcNuKrMiCPLByGafow==}
     engines: {node: '>=4'}
@@ -2435,6 +2459,10 @@ packages:
     resolution: {integrity: sha512-33g0Ol9nkWdD6ulw687viS8YJQBxqG5LWII6FI6nul0pq6iM2t5EKquOTFDbyTblRB3O9I+7KX4xI8u5ffekAQ==}
     peerDependencies:
       graphology-types: '>=0.24.0'
+
+  happy-dom@20.14.0:
+    resolution: {integrity: sha512-4bRh1KzRvKDnFNTlLhzT1RZTpkKhQbQDl9j+7GXszWsvuspYdo29k6OHRf4PwiM6oLb8r/pMWeYiJjkfod5AvQ==}
+    engines: {node: '>=20.0.0'}
 
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
@@ -4118,6 +4146,10 @@ packages:
       webpack-cli:
         optional: true
 
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
+
   which-typed-array@1.1.22:
     resolution: {integrity: sha512-fvO4ExWMFsqyhG3AiPAObMuY1lxaqgYcxbc49CNdWDDECOJNgQyvsOWVwbZc+qf3rzRtxojBK+CMEv0Ld5CYpw==}
     engines: {node: '>= 0.4'}
@@ -4140,6 +4172,18 @@ packages:
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+  ws@8.21.3:
+    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   xml-writer@1.7.0:
     resolution: {integrity: sha512-elFVMRiV5jb59fbc87zzVa0C01QLBEWP909mRuWqFqrYC5wNTH5QW4AaKMNv7d6zAsuOulkD7wnztZNLQW0Nfg==}
@@ -5004,6 +5048,14 @@ snapshots:
 
   '@gar/promisify@1.1.3': {}
 
+  '@happy-dom/global-registrator@20.14.0':
+    dependencies:
+      '@types/node': 24.11.1
+      happy-dom: 20.14.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -5130,6 +5182,12 @@ snapshots:
   '@types/node@24.11.1':
     dependencies:
       undici-types: 7.16.0
+
+  '@types/whatwg-mimetype@3.0.2': {}
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 24.11.1
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
@@ -5811,6 +5869,10 @@ snapshots:
 
   buffer-from@1.1.2: {}
 
+  buffer-image-size@0.6.4:
+    dependencies:
+      '@types/node': 24.11.1
+
   buffer-xor@1.0.3: {}
 
   buffer@4.9.2:
@@ -6238,6 +6300,8 @@ snapshots:
 
   entities@2.2.0: {}
 
+  entities@7.0.1: {}
+
   envinfo@7.21.0: {}
 
   errno@0.1.8:
@@ -6528,6 +6592,19 @@ snapshots:
       events: 3.3.0
       graphology-types: 0.24.8
       obliterator: 2.0.5
+
+  happy-dom@20.14.0:
+    dependencies:
+      '@types/node': 24.11.1
+      '@types/whatwg-mimetype': 3.0.2
+      '@types/ws': 8.18.1
+      buffer-image-size: 0.6.4
+      entities: 7.0.1
+      whatwg-mimetype: 3.0.0
+      ws: 8.21.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   has-flag@4.0.0: {}
 
@@ -8059,7 +8136,7 @@ snapshots:
       fsevents: 2.3.3
       terser: 5.50.0
 
-  vitest@4.1.11(@types/node@24.11.1)(vite@8.2.2(@types/node@24.11.1)(terser@5.50.0)):
+  vitest@4.1.11(@types/node@24.11.1)(happy-dom@20.14.0)(vite@8.2.2(@types/node@24.11.1)(terser@5.50.0)):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(vite@8.2.2(@types/node@24.11.1)(terser@5.50.0))
@@ -8083,6 +8160,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 24.11.1
+      happy-dom: 20.14.0
     transitivePeerDependencies:
       - msw
 
@@ -8282,6 +8360,8 @@ snapshots:
       - postcss
       - uglify-js
 
+  whatwg-mimetype@3.0.0: {}
+
   which-typed-array@1.1.22:
     dependencies:
       available-typed-arrays: 1.0.7
@@ -8308,6 +8388,8 @@ snapshots:
       errno: 0.1.8
 
   wrappy@1.0.2: {}
+
+  ws@8.21.3: {}
 
   xml-writer@1.7.0: {}
 

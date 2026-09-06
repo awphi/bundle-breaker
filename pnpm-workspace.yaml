@@ -1,5 +1,5 @@
 packages:
-  - 'examples/*'
+  - 'e2e/examples/*'
 allowBuilds:
   esbuild: true
   fsevents: true

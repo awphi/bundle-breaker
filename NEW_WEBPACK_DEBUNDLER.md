@@ -117,7 +117,7 @@ split-chunks case below, where it's empty) and to look for an entry invocation.
   `exports.modules` object.
 
 - **`chunkFormat: "module"`** (ESM chunks, `examples/webpack5_109-splitchunks-mjs` —
-  confirmed by inspection, not `webpack5_109-complex`, which turns out not to set
+  confirmed by inspection, not `webpack5_109-complex-dom`, which turns out not to set
   `chunkFormat` and defaults to jsonp): the additional chunk is real ESM,
   `export const <name> = <id>|[<ids>]|{<module map>}` — three `export const`
   declarations, the module map living in whichever one initializes to an

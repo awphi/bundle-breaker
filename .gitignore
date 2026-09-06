@@ -1,5 +1,5 @@
 node_modules/
 dist/
 out/
-examples/custom/
+e2e/examples/custom/
 .env
