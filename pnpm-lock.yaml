@@ -220,7 +220,37 @@ importers:
         specifier: 5.1.4
         version: 5.1.4(webpack@5.109.2)
 
+  examples/webpack5_109-splitchunks-cjs:
+    devDependencies:
+      babel-loader:
+        specifier: ^8.0.5
+        version: 8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.109.2)
+      is-even:
+        specifier: ^1.0.0
+        version: 1.0.0
+      webpack:
+        specifier: 5.109.2
+        version: 5.109.2(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
+      webpack-cli:
+        specifier: 5.1.4
+        version: 5.1.4(webpack@5.109.2)
+
   examples/webpack5_109-splitchunks-hashed-ids:
+    devDependencies:
+      babel-loader:
+        specifier: ^8.0.5
+        version: 8.4.1(@babel/core@7.29.7(supports-color@8.1.1))(webpack@5.109.2)
+      is-even:
+        specifier: ^1.0.0
+        version: 1.0.0
+      webpack:
+        specifier: 5.109.2
+        version: 5.109.2(clean-css@5.3.3)(esbuild@0.21.5)(html-minifier-terser@6.1.0)(lightningcss@1.33.0)(postcss@8.5.26)(webpack-cli@5.1.4)
+      webpack-cli:
+        specifier: 5.1.4
+        version: 5.1.4(webpack@5.109.2)
+
+  examples/webpack5_109-splitchunks-mjs:
     devDependencies:
       babel-loader:
         specifier: ^8.0.5

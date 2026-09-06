@@ -1,9 +1,9 @@
 # Resurrection
 
-- [ ] Major refactor of internals - easier to follow etc
-- [ ] Re-thinking testing strategy (related to above) - examples power e2e, level level unit tests for internals
-- [ ] API update - think about a cleaner, deeper interface
+- [ ] Re-do webpack debundler from near-scratch with simpler, functional core/imperative shell pattern. All mutation happens in the shell with simple functional primitives. Attempt to drop complexities like module_mapping et al.
 - [ ] Re-add WP5.104 terser example which fails with current implementation
+
+---
 
 # Features
 

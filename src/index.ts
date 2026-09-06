@@ -52,6 +52,10 @@ export function parse(inputFiles: Record<string, string>): RawBundle {
   return { files };
 }
 
+export async function load(input: string): Promise<RawBundle> {
+  return parse(await read(input));
+}
+
 export function split(bundle: RawBundle): Bundle {
   return findDebundler(bundle, DEBUNDLERS).split(bundle);
 }
