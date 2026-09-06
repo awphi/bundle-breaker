@@ -70,7 +70,10 @@ export function isIdentifiedFunctionDeclaration(
 export function isNormalMemberExpression(
   node: t.Node
 ): node is NormalMemberExpression {
-  return t.isMemberExpression(node) && t.isIdentifier(node.property);
+  return (
+    t.isMemberExpression(node, { computed: false }) &&
+    t.isIdentifier(node.property)
+  );
 }
 
 export function cloneFileNode(node: FileNode): FileNode {
