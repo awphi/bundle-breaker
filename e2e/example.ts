@@ -42,6 +42,10 @@ export function exampleDir(example: string): string {
   return path.resolve(EXAMLES_DIR, example, "out");
 }
 
+export function exampleName(outDir: string): string {
+  return path.basename(path.dirname(outDir));
+}
+
 export async function buildAllExamples(): Promise<void> {
   const promises = [];
   const fail: string[] = [];
