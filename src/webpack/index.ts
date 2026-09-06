@@ -1,22 +1,21 @@
 import type { AnyFunctionExpression } from "../ast";
 import type { Bundle, FileNode, RawBundle } from "../types";
-import { extractAdditionalChunk } from "./additional-chunks";
+import { readAdditionalChunk, readRuntimeChunk, findRuntimeChunkFile } from "./chunks";
 import {
-  buildEntryFileFromTrailingStatements,
-  buildModuleFile,
+  createEntryFileFromTrailingCode,
+  createModuleFile,
+  createRuntimeShimFile,
   ENTRY_PATH,
   modulePath,
   relativeRequirePath,
   RUNTIME_SHIM_PATH,
-} from "./module";
-import { createRuntimeShimFile } from "./runtime-shim";
-import { extractRuntimeChunk, findRuntimeChunk } from "./runtime-chunk";
+} from "./output";
 
 export const name = "webpack";
 
 export function detect(bundle: RawBundle): number {
   try {
-    findRuntimeChunk([...bundle.files.values()]);
+    findRuntimeChunkFile([...bundle.files.values()]);
     return 1;
   } catch {
     return 0;
@@ -25,8 +24,8 @@ export function detect(bundle: RawBundle): number {
 
 export function split(bundle: RawBundle): Bundle {
   const files = [...bundle.files.values()];
-  const runtimeChunkFile = findRuntimeChunk(files);
-  const runtimeInfo = extractRuntimeChunk(runtimeChunkFile);
+  const runtimeChunkFile = findRuntimeChunkFile(files);
+  const runtimeInfo = readRuntimeChunk(runtimeChunkFile);
 
   const moduleFns = new Map<string, AnyFunctionExpression>(
     runtimeInfo.moduleMap.moduleFns
@@ -36,7 +35,7 @@ export function split(bundle: RawBundle): Bundle {
   for (const file of files) {
     if (file.path === runtimeChunkFile.path) continue;
 
-    const additional = extractAdditionalChunk(file);
+    const additional = readAdditionalChunk(file);
     if (!additional) continue;
 
     for (const [id, fn] of additional.moduleMap.moduleFns) {
@@ -87,12 +86,12 @@ export function split(bundle: RawBundle): Bundle {
 
   for (const [id, fn] of moduleFns) {
     const filePath = idToPath.get(id)!;
-    const file = buildModuleFile(fn, filePath, makeResolveId(filePath));
+    const file = createModuleFile(fn, filePath, makeResolveId(filePath));
     outFiles.set(file.path, file);
   }
 
   if (usingTrailingStatements) {
-    const file = buildEntryFileFromTrailingStatements(
+    const file = createEntryFileFromTrailingCode(
       runtimeInfo.trailingStatements,
       runtimeInfo.requireFnName,
       makeResolveId(ENTRY_PATH)

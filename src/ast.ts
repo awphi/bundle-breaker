@@ -77,10 +77,6 @@ export function isNormalMemberExpression(
   );
 }
 
-/** Strips all comments from `node` and its descendants in place - used to
- * drop webpack's own module-boundary marker comments, which would otherwise
- * leak into extracted module bodies once they're no longer sitting inside
- * the original module-map/wrapper-function context. */
 /**
  * Checks that `idPath` is a genuine reference resolving (via scope, not name
  * string comparison) to `target`'s own binding. Minifiers routinely reuse
@@ -95,12 +91,38 @@ export function referencesBinding(idPath: NodePath, target: t.Node): boolean {
   return binding !== undefined && binding.path.node === target;
 }
 
+/** Strips all comments from `node` and its descendants in place - used to
+ * drop webpack's own module-boundary marker comments, which would otherwise
+ * leak into extracted module bodies once they're no longer sitting inside
+ * the original module-map/wrapper-function context. */
 export function stripComments(node: t.Node): void {
   t.traverseFast(node, (n) => {
     n.leadingComments = null;
     n.trailingComments = null;
     n.innerComments = null;
   });
+}
+
+/** Walks up from `path` to the nearest ancestor statement that is itself one
+ * of `candidates` (a specific, known list of statements). */
+export function findEnclosingStatement(
+  path: NodePath,
+  candidates: readonly t.Statement[]
+): t.Statement | undefined {
+  const stmtPath = path.find(
+    (p) => t.isStatement(p.node) && candidates.includes(p.node as t.Statement)
+  );
+  return stmtPath ? (stmtPath.node as t.Statement) : undefined;
+}
+
+/** If `stmt` is a no-argument IIFE call with a block body, returns that
+ * block's own statement list. */
+export function getIifeBody(stmt: t.Statement): t.Statement[] | undefined {
+  const iife = getIifeCallExpression(stmt);
+  if (iife && iife.arguments.length === 0 && t.isBlockStatement(iife.callee.body)) {
+    return iife.callee.body.body;
+  }
+  return undefined;
 }
 
 export function cloneFileNode(node: FileNode): FileNode {
