@@ -1,10 +1,3 @@
-# Resurrection
-
-- [ ] Re-do webpack debundler from near-scratch with simpler, functional core/imperative shell pattern. All mutation happens in the shell with simple functional primitives. Attempt to drop complexities like module_mapping et al.
-- [ ] Re-add WP5.104 terser example which fails with current implementation
-
----
-
 # Features
 
 - [ ] Group: Graph clustering on the module graph + group modules into directories
