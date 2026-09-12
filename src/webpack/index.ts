@@ -1,6 +1,10 @@
 import type { AnyFunctionExpression } from "../ast";
 import type { Bundle, FileNode, RawBundle } from "../types";
-import { readAdditionalChunk, readRuntimeChunk, findRuntimeChunkFile } from "./chunks";
+import {
+  readAdditionalChunk,
+  readRuntimeChunk,
+  findRuntimeChunkFile,
+} from "./chunks";
 import {
   createEntryFileFromTrailingCode,
   createModuleFile,
@@ -31,7 +35,7 @@ export function split(bundle: RawBundle): Bundle {
   const moduleFns = new Map<string, AnyFunctionExpression>(
     runtimeInfo.moduleFns
   );
-  let entryId = runtimeInfo.entryId;
+  let entryModuleId = runtimeInfo.entryId;
 
   for (const file of files) {
     if (file.path === runtimeChunkFile.path) continue;
@@ -49,24 +53,25 @@ export function split(bundle: RawBundle): Bundle {
     }
 
     if (additional.entryId !== undefined) {
-      if (entryId !== undefined && entryId !== additional.entryId) {
+      if (entryModuleId !== undefined && entryModuleId !== additional.entryId) {
         throw new Error(
-          `Found multiple candidate entry ids: '${entryId}' and '${additional.entryId}'`
+          `Found multiple candidate entry ids: '${entryModuleId}' and '${additional.entryId}'`
         );
       }
-      entryId = additional.entryId;
+      entryModuleId = additional.entryId;
     }
   }
 
-  if (entryId !== undefined && !moduleFns.has(entryId)) {
+  if (entryModuleId !== undefined && !moduleFns.has(entryModuleId)) {
     throw new Error(
-      `Detected entry id '${entryId}' but no module with that id was found`
+      `Detected entry id '${entryModuleId}' but no module with that id was found`
     );
   }
 
-  const entryTrailingCode =
-    entryId === undefined ? runtimeInfo.resolveEntryTrailingCode() : [];
-  if (entryId === undefined && entryTrailingCode.length === 0) {
+  if (
+    entryModuleId === undefined &&
+    runtimeInfo.entryTrailingCode.length === 0
+  ) {
     throw new Error(
       `Failed to find an entry point anywhere in the bundle (file: ${runtimeChunkFile.path})`
     );
@@ -74,7 +79,7 @@ export function split(bundle: RawBundle): Bundle {
 
   const idToPath = new Map<string, string>();
   for (const id of moduleFns.keys()) {
-    idToPath.set(id, id === entryId ? ENTRY_PATH : modulePath(id));
+    idToPath.set(id, id === entryModuleId ? ENTRY_PATH : modulePath(id));
   }
 
   function makeResolveId(fromPath: string): (id: string) => string | undefined {
@@ -92,9 +97,9 @@ export function split(bundle: RawBundle): Bundle {
     outFiles.set(file.path, file);
   }
 
-  if (entryId === undefined) {
+  if (entryModuleId === undefined) {
     const file = createEntryFileFromTrailingCode(
-      entryTrailingCode,
+      runtimeInfo.entryTrailingCode,
       runtimeInfo.requireFnName,
       makeResolveId(ENTRY_PATH)
     );

@@ -22,9 +22,10 @@ const EXAMPLES = ALL_EXAMPLES.map((outDir) => ({
 
 describe.each(EXAMPLES)("Debundle $name", async ({ name, outDir }) => {
   const inputFiles = await load(outDir);
-  const bundle = split(inputFiles);
 
   test(`${name} can be split`, () => {
+    const bundle = split(inputFiles);
+
     expect(bundle.adapter).toMatch(/.+/);
     expect(bundle.files.size).toBeGreaterThan(0);
     const files = [...bundle.files.keys()];
@@ -35,6 +36,8 @@ describe.each(EXAMPLES)("Debundle $name", async ({ name, outDir }) => {
   });
 
   test(`${name} split output is executable`, async () => {
+    const bundle = split(inputFiles);
+
     const dir = await tmpOutDir();
     await save(dir, bundle);
     const entry = path.join(dir, "index.js");

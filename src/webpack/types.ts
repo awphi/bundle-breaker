@@ -9,7 +9,7 @@ export interface RuntimeChunkInfo {
   readonly moduleFns: ModuleFnMap;
   readonly relocatableHelperStatements: readonly t.Statement[];
   readonly entryId: string | undefined;
-  readonly resolveEntryTrailingCode: () => readonly t.Statement[];
+  readonly entryTrailingCode: readonly t.Statement[];
 }
 
 export interface AdditionalChunkInfo {

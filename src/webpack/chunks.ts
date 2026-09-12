@@ -13,8 +13,16 @@ import type {
   RuntimeChunkInfo,
   ModuleFnMap,
 } from "./types";
-import { getJsonpPushedArray, makeModuleMap, tryMakeModuleMap } from "./module-map";
-import { findEntryIdInAdditionalChunk, findEntryIdInRuntimeChunk, findEntryTrailingCode } from "./entry";
+import {
+  getJsonpPushedArray,
+  makeModuleMap,
+  tryMakeModuleMap,
+} from "./module-map";
+import {
+  findEntryIdInAdditionalChunk,
+  findEntryIdInRuntimeChunk,
+  findEntryTrailingCode,
+} from "./entry";
 import { findRelocatableHelperStatements } from "./helpers";
 
 function isComputedMemberCall(callee: t.Node): boolean {
@@ -29,12 +37,16 @@ function isDotCallOnComputedMember(callee: t.Node): boolean {
   );
 }
 
-function containsModuleExecutionCall(fn: IdentifiedFunctionDeclaration): boolean {
+function containsModuleExecutionCall(
+  fn: IdentifiedFunctionDeclaration
+): boolean {
   let found = false;
 
   traverse.cheap(fn, (node) => {
     if (found || !t.isCallExpression(node)) return;
-    found = isComputedMemberCall(node.callee) || isDotCallOnComputedMember(node.callee);
+    found =
+      isComputedMemberCall(node.callee) ||
+      isDotCallOnComputedMember(node.callee);
   });
 
   return found;
@@ -81,10 +93,7 @@ function findModuleMapFromVariableDeclaration(
   return undefined;
 }
 
-function findModuleMapInRuntimeChunk({
-  ast,
-  path,
-}: FileNode): ModuleFnMap {
+function findModuleMapInRuntimeChunk({ ast, path }: FileNode): ModuleFnMap {
   const moduleMap =
     findModuleMapFromIifeArgument(ast.program) ??
     findModuleMapFromVariableDeclaration(maybeUnwrapTopLevelIife(ast.program));
@@ -128,8 +137,7 @@ export function readRuntimeChunk(file: FileNode): RuntimeChunkInfo {
       topLevelBody
     ),
     entryId: findEntryIdInRuntimeChunk(file.ast, requireFn),
-    resolveEntryTrailingCode: () =>
-      findEntryTrailingCode(file.ast, requireFn, topLevelBody),
+    entryTrailingCode: findEntryTrailingCode(file.ast, requireFn, topLevelBody),
   };
 }
 
