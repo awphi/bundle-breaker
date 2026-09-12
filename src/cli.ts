@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import { program } from "commander";
 import { version, description, name } from "../package.json";
-import { load, parse, read, save, split } from ".";
+import { load, save, split } from ".";
 
 function timestamp(): string {
   return new Date().toLocaleTimeString("en-GB", { timeStyle: "medium" });
 }
 
 function log(message: string): void {
-  console.log(`${timestamp()} ${message}`);
+  console.error(`${timestamp()} ${message}`);
 }
 
 // TODO be a better behaved CLI tool - only log to stderr, something useful in stdout, log-level, colors?
