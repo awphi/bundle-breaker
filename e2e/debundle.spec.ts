@@ -4,7 +4,7 @@ import { execFileSync } from "child_process";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { ALL_EXAMPLES, buildAllExamples, exampleName } from "./example";
+import { ALL_EXAMPLES, exampleName } from "./example";
 
 const HAPPY_DOM_ENV = path.resolve(import.meta.dirname, "happy-dom-env.mjs");
 const DOM_SUFFIX = "-dom";
@@ -13,17 +13,15 @@ async function tmpOutDir(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "bundle-breaker-e2e-"));
 }
 
-beforeAll(() => buildAllExamples());
-
 const EXAMPLES = ALL_EXAMPLES.map((outDir) => ({
   name: exampleName(outDir),
   outDir,
 }));
 
-describe.each(EXAMPLES)("Debundle $name", async ({ name, outDir }) => {
-  const inputFiles = await load(outDir);
+describe.each(EXAMPLES)("Debundle $name", ({ name, outDir }) => {
+  test(`${name} can be split`, async () => {
+    const inputFiles = await load(outDir);
 
-  test(`${name} can be split`, () => {
     const bundle = split(inputFiles);
 
     expect(bundle.adapter).toMatch(/.+/);
@@ -36,6 +34,8 @@ describe.each(EXAMPLES)("Debundle $name", async ({ name, outDir }) => {
   });
 
   test(`${name} split output is executable`, async () => {
+    const inputFiles = await load(outDir);
+
     const bundle = split(inputFiles);
 
     const dir = await tmpOutDir();
