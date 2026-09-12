@@ -1,4 +1,5 @@
 import type { AnyFunctionExpression } from "../ast";
+import type { AdditionalChunkInfo, ModuleFnMap, RuntimeChunkInfo } from "./types";
 import type { Bundle, FileNode, RawBundle } from "../types";
 import {
   readAdditionalChunk,
@@ -27,41 +28,79 @@ export function detect(bundle: RawBundle): number {
   }
 }
 
+function mergeModuleMaps(chunks: readonly AdditionalChunkInfo[]): ModuleFnMap {
+  const modules = new Map<string, AnyFunctionExpression>();
+  for (const chunk of chunks) {
+    for (const [id, fn] of chunk.moduleFns) {
+      if (modules.has(id)) {
+        throw new Error(
+          `Encountered module ID clash '${id}' while merging chunk ${chunk.path}`
+        );
+      }
+      modules.set(id, fn);
+    }
+  }
+  return modules;
+}
+
+function findEntryModuleId(
+  chunks: readonly AdditionalChunkInfo[]
+): string | undefined {
+  let entryId: string | undefined;
+  for (const chunk of chunks) {
+    if (chunk.entryId === undefined) {
+      continue;
+    }
+    if (entryId !== undefined && entryId !== chunk.entryId) {
+      throw new Error(
+        `Found multiple candidate entry ids: '${entryId}' and '${chunk.entryId}'`
+      );
+    }
+    entryId = chunk.entryId;
+  }
+  return entryId;
+}
+
+function createModuleIdResolver(
+  idToPath: ReadonlyMap<string, string>,
+  fromPath: string
+): (id: string) => string | undefined {
+  return (id) => {
+    const targetPath = idToPath.get(id);
+    return targetPath === undefined
+      ? undefined
+      : relativeRequirePath(fromPath, targetPath);
+  };
+}
+
 export function split(bundle: RawBundle): Bundle {
   const files = [...bundle.files.values()];
   const runtimeChunkFile = findRuntimeChunkFile(files);
   const runtimeInfo = readRuntimeChunk(runtimeChunkFile);
-
-  const moduleFns = new Map<string, AnyFunctionExpression>(
-    runtimeInfo.moduleFns
-  );
-  let entryModuleId = runtimeInfo.entryId;
-
+  const chunks: AdditionalChunkInfo[] = [runtimeInfo];
   for (const file of files) {
-    if (file.path === runtimeChunkFile.path) continue;
-
-    const additional = readAdditionalChunk(file);
-    if (!additional) continue;
-
-    for (const [id, fn] of additional.moduleFns) {
-      if (moduleFns.has(id)) {
-        throw new Error(
-          `Encountered module ID clash '${id}' while merging chunk ${file.path}`
-        );
-      }
-      moduleFns.set(id, fn);
+    if (file.path === runtimeChunkFile.path) {
+      continue;
     }
-
-    if (additional.entryId !== undefined) {
-      if (entryModuleId !== undefined && entryModuleId !== additional.entryId) {
-        throw new Error(
-          `Found multiple candidate entry ids: '${entryModuleId}' and '${additional.entryId}'`
-        );
-      }
-      entryModuleId = additional.entryId;
+    const chunk = readAdditionalChunk(file);
+    if (chunk) {
+      chunks.push(chunk);
     }
   }
+  const moduleFns = mergeModuleMaps(chunks);
+  const entryModuleId = findEntryModuleId(chunks);
 
+  return {
+    adapter: name,
+    files: createOutputFiles(runtimeInfo, moduleFns, entryModuleId),
+  };
+}
+
+function createOutputFiles(
+  runtimeInfo: RuntimeChunkInfo,
+  moduleFns: ModuleFnMap,
+  entryModuleId: string | undefined
+): Map<string, FileNode> {
   if (entryModuleId !== undefined && !moduleFns.has(entryModuleId)) {
     throw new Error(
       `Detected entry id '${entryModuleId}' but no module with that id was found`
@@ -73,7 +112,7 @@ export function split(bundle: RawBundle): Bundle {
     runtimeInfo.entryTrailingCode.length === 0
   ) {
     throw new Error(
-      `Failed to find an entry point anywhere in the bundle (file: ${runtimeChunkFile.path})`
+      `Failed to find an entry point anywhere in the bundle (file: ${runtimeInfo.path})`
     );
   }
 
@@ -82,18 +121,13 @@ export function split(bundle: RawBundle): Bundle {
     idToPath.set(id, id === entryModuleId ? ENTRY_PATH : modulePath(id));
   }
 
-  function makeResolveId(fromPath: string): (id: string) => string | undefined {
-    return (id) => {
-      const targetPath = idToPath.get(id);
-      return targetPath ? relativeRequirePath(fromPath, targetPath) : undefined;
-    };
-  }
-
   const outFiles = new Map<string, FileNode>();
 
   for (const [id, fn] of moduleFns) {
     const filePath = idToPath.get(id)!;
-    const file = createModuleFile(fn, filePath, makeResolveId(filePath));
+    const file = createModuleFile(
+      fn, filePath, createModuleIdResolver(idToPath, filePath)
+    );
     outFiles.set(file.path, file);
   }
 
@@ -101,14 +135,18 @@ export function split(bundle: RawBundle): Bundle {
     const file = createEntryFileFromTrailingCode(
       runtimeInfo.entryTrailingCode,
       runtimeInfo.requireFnName,
-      makeResolveId(ENTRY_PATH)
+      createModuleIdResolver(idToPath, ENTRY_PATH)
     );
     outFiles.set(file.path, file);
   }
 
-  const shimIsNeeded = [...outFiles.values()].some((file) =>
-    fileRequires(file.ast, relativeRequirePath(file.path, RUNTIME_SHIM_PATH))
-  );
+  let shimIsNeeded = false;
+  for (const file of outFiles.values()) {
+    if (fileRequires(file.ast, relativeRequirePath(file.path, RUNTIME_SHIM_PATH))) {
+      shimIsNeeded = true;
+      break;
+    }
+  }
 
   if (shimIsNeeded) {
     const shimIdToPath = new Map<string, string>();
@@ -124,5 +162,5 @@ export function split(bundle: RawBundle): Bundle {
     outFiles.set(shimFile.path, shimFile);
   }
 
-  return { adapter: name, files: outFiles };
+  return outFiles;
 }

@@ -84,7 +84,9 @@ export function literalId(node: t.Node | null | undefined): string | undefined {
 }
 
 export function isSameBinding(idPath: NodePath, target: t.Node): boolean {
-  if (!idPath.isReferencedIdentifier()) return false;
+  if (!idPath.isReferencedIdentifier()) {
+    return false;
+  }
   const binding = idPath.scope.getBinding(idPath.node.name);
   return binding !== undefined && binding.path.node === target;
 }
@@ -101,10 +103,15 @@ export function findEnclosingStatementAmong(
   path: NodePath,
   candidates: readonly t.Statement[]
 ): t.Statement | undefined {
-  const stmtPath = path.find(
-    (p) => t.isStatement(p.node) && candidates.includes(p.node as t.Statement)
-  );
-  return stmtPath ? (stmtPath.node as t.Statement) : undefined;
+  let current: NodePath | null = path;
+  while (current !== null) {
+    const node = current.node;
+    if (t.isStatement(node) && candidates.includes(node)) {
+      return node;
+    }
+    current = current.parentPath;
+  }
+  return undefined;
 }
 
 export function wrapForTraversal(stmt: t.Statement): t.File {

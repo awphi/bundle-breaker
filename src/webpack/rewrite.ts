@@ -7,11 +7,12 @@ export function rewriteRequireCalls(
   requireFnName: string,
   resolveModuleId: (id: string) => string | undefined,
   shimRequirePath: string
-): void {
+): t.File {
   const requireShim = (): t.CallExpression =>
     t.callExpression(t.identifier("require"), [t.stringLiteral(shimRequirePath)]);
 
-  traverse(file, {
+  const rewritten = t.cloneNode(file, true);
+  traverse(rewritten, {
     CallExpression(path) {
       const node = path.node;
       if (
@@ -22,7 +23,7 @@ export function rewriteRequireCalls(
         return;
       }
 
-      const arg = node.arguments[0] as t.Expression;
+      const arg = node.arguments[0];
       const id = literalId(arg);
       const resolved = id !== undefined ? resolveModuleId(id) : undefined;
 
@@ -34,11 +35,14 @@ export function rewriteRequireCalls(
       path.skip();
     },
     Identifier(path) {
-      if (path.node.name !== requireFnName || !path.isReferencedIdentifier()) return;
+      if (path.node.name !== requireFnName || !path.isReferencedIdentifier()) {
+        return;
+      }
       path.replaceWith(requireShim());
       path.skip();
     },
   });
+  return rewritten;
 }
 
 export function fileRequires(file: t.File, requirePath: string): boolean {
@@ -46,13 +50,16 @@ export function fileRequires(file: t.File, requirePath: string): boolean {
 
   traverse(file, {
     CallExpression(path) {
-      if (found) return;
+      if (found) {
+        return;
+      }
       const [arg] = path.node.arguments;
       if (
         t.isIdentifier(path.node.callee, { name: "require" }) &&
         t.isStringLiteral(arg, { value: requirePath })
       ) {
         found = true;
+        path.stop();
       }
     },
   });

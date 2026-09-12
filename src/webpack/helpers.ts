@@ -16,22 +16,26 @@ function isFreeOfOuterReferences(
   let ok = true;
 
   function check(idPath: NodePath): void {
-    if (!ok || !idPath.isReferencedIdentifier()) return;
-    if (isSameBinding(idPath, requireFn)) return;
+    if (!ok || !idPath.isReferencedIdentifier()) {
+      return;
+    }
+    if (isSameBinding(idPath, requireFn)) {
+      return;
+    }
 
     const binding = idPath.scope.getBinding(idPath.node.name);
-    if (!binding) return;
-
-    let boundInsideValue = false;
-    let p: NodePath | null = binding.path;
-    while (p) {
-      if (p.node === valuePath.node) {
-        boundInsideValue = true;
-        break;
-      }
-      p = p.parentPath;
+    if (!binding) {
+      return;
     }
-    if (!boundInsideValue) ok = false;
+
+    let current: NodePath | null = binding.path;
+    while (current !== null) {
+      if (current.node === valuePath.node) {
+        return;
+      }
+      current = current.parentPath;
+    }
+    ok = false;
   }
 
   if (valuePath.isIdentifier()) {
@@ -53,8 +57,12 @@ function findRequireFnPropertyAssignments(
   traverse(ast, {
     AssignmentExpression(path) {
       const { left, operator } = path.node;
-      if (operator !== "=") return;
-      if (!isNormalMemberExpression(left)) return;
+      if (operator !== "=") {
+        return;
+      }
+      if (!isNormalMemberExpression(left)) {
+        return;
+      }
 
       const objPath = path.get("left.object") as NodePath;
       if (!objPath.isIdentifier() || !isSameBinding(objPath, requireFn)) {
@@ -62,7 +70,9 @@ function findRequireFnPropertyAssignments(
       }
 
       const stmt = findEnclosingStatementAmong(path, topLevelBody);
-      if (!stmt) return;
+      if (!stmt) {
+        return;
+      }
 
       const list = byStatement.get(stmt) ?? [];
       list.push(path);
@@ -73,33 +83,40 @@ function findRequireFnPropertyAssignments(
   return byStatement;
 }
 
-function relocateAssignmentsIfFree(
+function relocateFreeAssignments(
   assignments: readonly NodePath<t.AssignmentExpression>[],
-  requireFn: IdentifiedFunctionDeclaration,
-  out: t.Statement[]
-): void {
-  for (const assignPath of assignments) {
-    if (isFreeOfOuterReferences(assignPath.get("right") as NodePath, requireFn)) {
-      out.push(t.expressionStatement(t.cloneNode(assignPath.node, true)));
+  requireFn: IdentifiedFunctionDeclaration
+): t.Statement[] {
+  const statements: t.Statement[] = [];
+  for (const path of assignments) {
+    if (isFreeOfOuterReferences(path.get("right"), requireFn)) {
+      statements.push(t.expressionStatement(t.cloneNode(path.node, true)));
     }
   }
+  return statements;
 }
 
 function iifeHasOnlyPassiveDeclarationSiblings(
   iifeBody: readonly t.Statement[],
   assignments: readonly NodePath<t.AssignmentExpression>[]
 ): boolean {
-  const ownAssignmentStatements = new Set(
-    assignments
-      .map((p) => findEnclosingStatementAmong(p, iifeBody))
-      .filter((s): s is t.Statement => s !== undefined)
-  );
-  return iifeBody.every(
-    (s) =>
-      ownAssignmentStatements.has(s) ||
-      t.isVariableDeclaration(s) ||
-      t.isFunctionDeclaration(s)
-  );
+  const ownAssignmentStatements = new Set<t.Statement>();
+  for (const path of assignments) {
+    const statement = findEnclosingStatementAmong(path, iifeBody);
+    if (statement) {
+      ownAssignmentStatements.add(statement);
+    }
+  }
+  for (const statement of iifeBody) {
+    if (
+      !ownAssignmentStatements.has(statement) &&
+      !t.isVariableDeclaration(statement) &&
+      !t.isFunctionDeclaration(statement)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function findRelocatableHelperStatements(
@@ -112,19 +129,16 @@ export function findRelocatableHelperStatements(
     requireFn,
     topLevelBody
   );
-  const result: t.Statement[] = [];
-
+  const statements: t.Statement[] = [];
   for (const [stmt, assignments] of assignmentsByStatement) {
     const iifeBody = getNoArgIifeBody(stmt);
-
-    if (!iifeBody) {
-      relocateAssignmentsIfFree(assignments, requireFn, result);
-    } else if (iifeHasOnlyPassiveDeclarationSiblings(iifeBody, assignments)) {
-      result.push(t.cloneNode(stmt, true));
+    if (iifeBody && iifeHasOnlyPassiveDeclarationSiblings(iifeBody, assignments)) {
+      statements.push(t.cloneNode(stmt, true));
     } else {
-      relocateAssignmentsIfFree(assignments, requireFn, result);
+      for (const assignment of relocateFreeAssignments(assignments, requireFn)) {
+        statements.push(assignment);
+      }
     }
   }
-
-  return result;
+  return statements;
 }

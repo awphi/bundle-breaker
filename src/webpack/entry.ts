@@ -43,12 +43,17 @@ function findEntryCallWithSelfAssignedArg(
 
   traverse(chunkAst, {
     CallExpression(path) {
-      if (found) return;
+      if (found) {
+        return;
+      }
 
       const calleePath = path.get("callee") as NodePath;
-      if (!calleePath.isIdentifier() || !isSameBinding(calleePath, requireFn))
+      if (!calleePath.isIdentifier() || !isSameBinding(calleePath, requireFn)) {
         return;
-      if (path.node.arguments.length !== 1) return;
+      }
+      if (path.node.arguments.length !== 1) {
+        return;
+      }
 
       const arg = path.node.arguments[0];
       if (!t.isAssignmentExpression(arg) || !isNormalMemberExpression(arg.left)) {
@@ -66,6 +71,37 @@ function findEntryCallWithSelfAssignedArg(
   return found;
 }
 
+function findReturnedRequireId(
+  callback: NodePath,
+  requireFn: IdentifiedFunctionDeclaration
+): string | undefined {
+  if (!callback.isFunction() || callback.node.params.length !== 0) {
+    return undefined;
+  }
+  const body = callback.get("body") as NodePath;
+  if (body.isCallExpression()) {
+    return extractRequireCallId(body, requireFn);
+  }
+  if (!body.isBlockStatement()) {
+    return undefined;
+  }
+
+  for (const statement of body.get("body")) {
+    if (!statement.isReturnStatement()) {
+      continue;
+    }
+    const argument = statement.get("argument");
+    if (!argument.node) {
+      continue;
+    }
+    const id = extractRequireCallId(argument as NodePath, requireFn);
+    if (id !== undefined) {
+      return id;
+    }
+  }
+  return undefined;
+}
+
 function findEntryCallInDeferredCallback(
   chunkAst: t.File,
   requireFn: IdentifiedFunctionDeclaration
@@ -74,28 +110,23 @@ function findEntryCallInDeferredCallback(
 
   traverse(chunkAst, {
     CallExpression(path) {
-      if (found) return;
+      if (found) {
+        return;
+      }
 
       const calleePath = path.get("callee") as NodePath;
-      if (!calleePath.isMemberExpression()) return;
-      if (!isMemberChainRootedAtRequireFn(calleePath, requireFn)) return;
+      if (!calleePath.isMemberExpression()) {
+        return;
+      }
+      if (!isMemberChainRootedAtRequireFn(calleePath, requireFn)) {
+        return;
+      }
 
-      for (const argPath of path.get("arguments") as NodePath[]) {
-        if (found) break;
-        if (!argPath.isFunction() || argPath.node.params.length !== 0) continue;
-
-        const bodyPath = argPath.get("body") as NodePath;
-        if (bodyPath.isCallExpression()) {
-          found = extractRequireCallId(bodyPath, requireFn);
-        } else if (bodyPath.isBlockStatement()) {
-          for (const stmtPath of bodyPath.get("body") as NodePath[]) {
-            if (found) break;
-            if (!stmtPath.isReturnStatement()) continue;
-            const returnArgPath = stmtPath.get("argument") as NodePath;
-            if (returnArgPath.node) {
-              found = extractRequireCallId(returnArgPath, requireFn);
-            }
-          }
+      for (const argument of path.get("arguments")) {
+        found = findReturnedRequireId(argument, requireFn);
+        if (found !== undefined) {
+          path.stop();
+          return;
         }
       }
     },
@@ -119,18 +150,42 @@ export function findEntryIdInAdditionalChunk(
 ): string | undefined {
   for (const stmt of program.body) {
     const pushed = getJsonpPushedArray(stmt);
-    if (!pushed) continue;
+    if (!pushed) {
+      continue;
+    }
 
     const deferredTable = pushed.elements[2];
-    if (!deferredTable || !t.isArrayExpression(deferredTable)) continue;
+    if (!deferredTable || !t.isArrayExpression(deferredTable)) {
+      continue;
+    }
 
     const firstEntry = deferredTable.elements[0];
-    if (!firstEntry || !t.isArrayExpression(firstEntry)) continue;
+    if (!firstEntry || !t.isArrayExpression(firstEntry)) {
+      continue;
+    }
 
     const id = literalId(firstEntry.elements[0]);
-    if (id) return id;
+    if (id) {
+      return id;
+    }
   }
 
+  return undefined;
+}
+
+function findModuleMapDeclaration(
+  body: readonly t.Statement[]
+): t.VariableDeclaration | undefined {
+  for (const statement of body) {
+    if (!t.isVariableDeclaration(statement)) {
+      continue;
+    }
+    for (const declaration of statement.declarations) {
+      if (t.isObjectExpression(declaration.init)) {
+        return statement;
+      }
+    }
+  }
   return undefined;
 }
 
@@ -139,11 +194,7 @@ export function findEntryTrailingCode(
   requireFn: IdentifiedFunctionDeclaration,
   body: readonly t.Statement[]
 ): t.Statement[] {
-  const moduleMapDeclaration = body.find(
-    (stmt) =>
-      t.isVariableDeclaration(stmt) &&
-      stmt.declarations.some((d) => t.isObjectExpression(d.init))
-  );
+  const moduleMapDeclaration = findModuleMapDeclaration(body);
 
   const namespaceImportLocals = new Set<string>();
   for (const stmt of body) {
@@ -159,7 +210,9 @@ export function findEntryTrailingCode(
   const boilerplate = new Set<t.Statement>();
   function markBoilerplate(path: NodePath): void {
     const stmt = findEnclosingStatementAmong(path, body);
-    if (stmt) boilerplate.add(stmt);
+    if (stmt) {
+      boilerplate.add(stmt);
+    }
   }
 
   traverse(ast, {
@@ -171,8 +224,12 @@ export function findEntryTrailingCode(
     },
     CallExpression(path) {
       const calleePath = path.get("callee") as NodePath;
-      if (!calleePath.isMemberExpression()) return;
-      if (!isMemberChainRootedAtRequireFn(calleePath, requireFn)) return;
+      if (!calleePath.isMemberExpression()) {
+        return;
+      }
+      if (!isMemberChainRootedAtRequireFn(calleePath, requireFn)) {
+        return;
+      }
 
       const args = path.node.arguments;
       const arg = args[0];
@@ -182,11 +239,16 @@ export function findEntryTrailingCode(
     },
   });
 
-  return body.filter((stmt) => {
-    if (stmt === (requireFn as t.Statement)) return false;
-    if (stmt === moduleMapDeclaration) return false;
-    if (t.isImportDeclaration(stmt)) return false;
-    if (boilerplate.has(stmt)) return false;
-    return true;
-  });
+  const statements: t.Statement[] = [];
+  for (const statement of body) {
+    if (
+      statement !== requireFn &&
+      statement !== moduleMapDeclaration &&
+      !t.isImportDeclaration(statement) &&
+      !boilerplate.has(statement)
+    ) {
+      statements.push(statement);
+    }
+  }
+  return statements;
 }

@@ -13,11 +13,7 @@ import type {
   RuntimeChunkInfo,
   ModuleFnMap,
 } from "./types";
-import {
-  getJsonpPushedArray,
-  makeModuleMap,
-  tryMakeModuleMap,
-} from "./module-map";
+import { getJsonpPushedArray, makeModuleMap } from "./module-map";
 import {
   findEntryIdInAdditionalChunk,
   findEntryIdInRuntimeChunk,
@@ -43,7 +39,9 @@ function containsModuleExecutionCall(
   let found = false;
 
   traverse.cheap(fn, (node) => {
-    if (found || !t.isCallExpression(node)) return;
+    if (found || !t.isCallExpression(node)) {
+      return;
+    }
     found =
       isComputedMemberCall(node.callee) ||
       isDotCallOnComputedMember(node.callee);
@@ -55,8 +53,13 @@ function containsModuleExecutionCall(
 function findLastFunctionDeclaration(
   body: readonly t.Statement[]
 ): IdentifiedFunctionDeclaration | undefined {
-  const decs = body.filter(isIdentifiedFunctionDeclaration);
-  return decs.at(-1);
+  for (let i = body.length - 1; i >= 0; i--) {
+    const statement = body[i];
+    if (isIdentifiedFunctionDeclaration(statement)) {
+      return statement;
+    }
+  }
+  return undefined;
 }
 
 function findRequireFunction({
@@ -84,11 +87,16 @@ function findModuleMapFromIifeArgument(
 function findModuleMapFromVariableDeclaration(
   body: readonly t.Statement[]
 ): ModuleFnMap | undefined {
-  const firstVariableDec = body.find((v) => t.isVariableDeclaration(v));
-  for (const declarator of firstVariableDec?.declarations ?? []) {
-    if (t.isObjectExpression(declarator.init)) {
-      return makeModuleMap(declarator.init);
+  for (const statement of body) {
+    if (!t.isVariableDeclaration(statement)) {
+      continue;
     }
+    for (const declarator of statement.declarations) {
+      if (t.isObjectExpression(declarator.init)) {
+        return makeModuleMap(declarator.init);
+      }
+    }
+    break;
   }
   return undefined;
 }
@@ -114,12 +122,14 @@ function isRuntimeChunk(file: FileNode): boolean {
 }
 
 export function findRuntimeChunkFile(files: readonly FileNode[]): FileNode {
-  const file = files.find(isRuntimeChunk);
-  if (!file) {
-    const names = files.map((f) => f.path).join(", ");
-    throw new Error(`Failed to find runtime file in files: ${names}`);
+  const names: string[] = [];
+  for (const file of files) {
+    if (isRuntimeChunk(file)) {
+      return file;
+    }
+    names.push(file.path);
   }
-  return file;
+  throw new Error(`Failed to find runtime file in files: ${names.join(", ")}`);
 }
 
 export function readRuntimeChunk(file: FileNode): RuntimeChunkInfo {
@@ -156,7 +166,9 @@ function findModuleMapCandidates(program: t.Program): t.Expression[] {
 
     const pushed = getJsonpPushedArray(stmt);
     for (const el of pushed?.elements ?? []) {
-      if (el && t.isExpression(el)) candidates.push(el);
+      if (el && t.isExpression(el)) {
+        candidates.push(el);
+      }
     }
 
     if (
@@ -164,7 +176,9 @@ function findModuleMapCandidates(program: t.Program): t.Expression[] {
       t.isVariableDeclaration(stmt.declaration)
     ) {
       for (const decl of stmt.declaration.declarations) {
-        if (decl.init) candidates.push(decl.init);
+        if (decl.init) {
+          candidates.push(decl.init);
+        }
       }
     }
   }
@@ -179,8 +193,12 @@ export function readAdditionalChunk(
 
   let moduleFns: ModuleFnMap | undefined;
   for (const candidate of candidates) {
-    const map = tryMakeModuleMap(candidate);
-    if (!map) continue;
+    let map: ModuleFnMap;
+    try {
+      map = makeModuleMap(candidate);
+    } catch (e) {
+      continue;
+    }
     if (moduleFns) {
       throw new Error(
         `Found multiple candidate module maps in chunk ${chunk.path}`
@@ -189,7 +207,9 @@ export function readAdditionalChunk(
     moduleFns = map;
   }
 
-  if (!moduleFns) return undefined;
+  if (!moduleFns) {
+    return undefined;
+  }
 
   return {
     path: chunk.path,

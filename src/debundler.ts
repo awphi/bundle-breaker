@@ -20,9 +20,12 @@ export function findDebundler(
     }
   }
   if (bestMatch === null) {
-    const names = debundlers.map((d) => d.name).join(", ");
+    const names: string[] = [];
+    for (const debundler of debundlers) {
+      names.push(debundler.name);
+    }
     throw new Error(
-      `No suitable debundler found for the given bundle. Available debundlers: ${names}`
+      `No suitable debundler found for the given bundle. Available debundlers: ${names.join(", ")}`
     );
   }
   return bestMatch;

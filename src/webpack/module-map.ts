@@ -75,18 +75,3 @@ export function makeModuleMap(expr?: t.Node): ModuleFnMap {
     `Cannot construct module map from node of type ${expr?.type}`
   );
 }
-
-export function tryMakeModuleMap(
-  expr: t.Node | null | undefined
-): ModuleFnMap | undefined {
-  if (!t.isObjectExpression(expr) && !t.isArrayExpression(expr)) {
-    return undefined;
-  }
-
-  try {
-    const map = makeModuleMap(expr);
-    return map.size > 0 ? map : undefined;
-  } catch {
-    return undefined;
-  }
-}

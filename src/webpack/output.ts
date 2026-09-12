@@ -27,7 +27,9 @@ export function modulePath(id: string): string {
 export function relativeRequirePath(fromPath: string, toPath: string): string {
   const fromDir = path.posix.dirname(fromPath);
   let rel = path.posix.relative(fromDir, toPath);
-  if (!rel.startsWith(".")) rel = "./" + rel;
+  if (!rel.startsWith(".")) {
+    rel = "./" + rel;
+  }
   return rel;
 }
 
@@ -35,13 +37,16 @@ function renameParamsPositionally(fn: AnyFunctionExpression): void {
   const wrapper = wrapForTraversal(t.expressionStatement(fn));
   traverse(wrapper, {
     Function(fnPath) {
-      if (fnPath.node !== fn) return;
-      fnPath.node.params.forEach((param, i) => {
+      if (fnPath.node !== fn) {
+        return;
+      }
+      for (let i = 0; i < fnPath.node.params.length; i++) {
+        const param = fnPath.node.params[i];
         const newName = MODULE_PARAM_NAMES[i];
         if (newName && t.isIdentifier(param) && param.name !== newName) {
           fnPath.scope.rename(param.name, newName);
         }
-      });
+      }
       fnPath.stop();
     },
   });
@@ -64,8 +69,10 @@ function createFile(
 ): FileNode {
   const file = t.file(t.program(bodyStatements));
   const shimRequirePath = relativeRequirePath(filePath, RUNTIME_SHIM_PATH);
-  rewriteRequireCalls(file, requireFnName, resolveModuleId, shimRequirePath);
-  return { path: filePath, ast: file };
+  return {
+    path: filePath,
+    ast: rewriteRequireCalls(file, requireFnName, resolveModuleId, shimRequirePath),
+  };
 }
 
 export function createModuleFile(
@@ -81,8 +88,12 @@ export function createEntryFileFromTrailingCode(
   requireFnName: string,
   resolveModuleId: (id: string) => string | undefined
 ): FileNode {
-  const cloned = statements.map((stmt) => t.cloneNode(stmt, true));
-  cloned.forEach(stripComments);
+  const cloned: t.Statement[] = [];
+  for (const statement of statements) {
+    const copy = t.cloneNode(statement, true);
+    stripComments(copy);
+    cloned.push(copy);
+  }
   return createFile(ENTRY_PATH, cloned, requireFnName, resolveModuleId);
 }
 
@@ -110,7 +121,9 @@ const buildShimPrelude = template.statements(`
   const ID_TO_PATH = %%idToPathTable%%;
   function %%shimName%%(id) {
     const resolved = ID_TO_PATH[id];
-    if (resolved === undefined) throw new Error("Unknown webpack module id: " + id);
+    if (resolved === undefined) {
+      throw new Error("Unknown webpack module id: " + id);
+    }
     return require(resolved);
   }
   module.exports = %%shimName%%;
@@ -122,23 +135,22 @@ export function createRuntimeShimFile(
   idToPath: ReadonlyMap<string, string>,
   shimPath: string
 ): FileNode {
-  const idToPathTable = t.objectExpression(
-    [...idToPath.entries()].map(([id, relativePath]) =>
-      t.objectProperty(t.stringLiteral(id), t.stringLiteral(relativePath))
-    )
-  );
+  const properties: t.ObjectProperty[] = [];
+  for (const [id, relativePath] of idToPath) {
+    properties.push(t.objectProperty(t.stringLiteral(id), t.stringLiteral(relativePath)));
+  }
+  const idToPathTable = t.objectExpression(properties);
   const shimName = t.identifier(SHIM_FUNCTION_NAME);
   const [idToPathDecl, shimFn, exportStmt] = buildShimPrelude({
     idToPathTable,
     shimName,
   });
 
-  const statements = [
-    idToPathDecl,
-    shimFn,
-    ...helperStatements.map((stmt) => renameToShimFunction(stmt, requireFnName)),
-    exportStmt,
-  ];
+  const statements = [idToPathDecl, shimFn];
+  for (const statement of helperStatements) {
+    statements.push(renameToShimFunction(statement, requireFnName));
+  }
+  statements.push(exportStmt);
 
   return { path: shimPath, ast: t.file(t.program(statements)) };
 }

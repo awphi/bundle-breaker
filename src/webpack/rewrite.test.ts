@@ -14,11 +14,23 @@ function rewrite(
   shimPath = "./__webpack_runtime.js"
 ): string {
   const file = parseFile(code);
-  rewriteRequireCalls(file, requireFnName, (id) => ids[id], shimPath);
-  return generate(file).code;
+  const rewritten = rewriteRequireCalls(file, requireFnName, (id) => ids[id], shimPath);
+  return generate(rewritten).code;
 }
 
 describe("rewriteRequireCalls", () => {
+  it("returns an independent AST without changing its input", () => {
+    const file = parseFile("require(293);");
+    const before = generate(file).code;
+    const rewritten = rewriteRequireCalls(
+      file, "require", () => "./293.js", "./runtime.js"
+    );
+
+    expect(generate(file).code).toBe(before);
+    expect(generate(rewritten).code).toBe('require("./293.js");');
+    expect(rewritten.program.body[0]).not.toBe(file.program.body[0]);
+  });
+
   it("rewrites a literal-id call to a resolved require", () => {
     const out = rewrite(`__webpack_require__(293);`, "__webpack_require__", {
       "293": "./293.js",
