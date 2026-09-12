@@ -199,6 +199,9 @@ export function readAdditionalChunk(
     } catch (e) {
       continue;
     }
+    if (map.size === 0) {
+      continue;
+    }
     if (moduleFns) {
       throw new Error(
         `Found multiple candidate module maps in chunk ${chunk.path}`
