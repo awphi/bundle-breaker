@@ -3,3 +3,5 @@ dist/
 out/
 e2e/examples/custom/
 .env
+.parcel-cache
+.pnpm-store

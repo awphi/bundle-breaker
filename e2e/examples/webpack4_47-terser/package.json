@@ -1,6 +1,7 @@
 {
   "name": "@bundle-breaker/webpack4_47-terser",
   "private": true,
+  "scripts": { "build": "webpack -c webpack.config.js" },
   "devDependencies": {
     "is-even": "^1.0.0",
     "babel-loader": "^8.0.5",

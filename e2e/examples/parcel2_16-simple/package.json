@@ -1,0 +1,11 @@
+{
+  "name": "@bundle-breaker/parcel2_16-simple",
+  "private": true,
+  "scripts": {
+    "build": "parcel build index.js --dist-dir out"
+  },
+  "devDependencies": {
+    "is-even": "^1.0.0",
+    "parcel": "^2.16.4"
+  }
+}

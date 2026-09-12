@@ -1,5 +1,9 @@
 packages:
   - 'e2e/examples/*'
 allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
   esbuild: true
   fsevents: true
+  lmdb: true
+  msgpackr-extract: true
