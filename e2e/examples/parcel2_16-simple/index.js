@@ -1,3 +1,3 @@
-const isEven = require("is-even");
+import isEven from "is-even";
 
 console.log("is-even:", isEven, isEven(8));
