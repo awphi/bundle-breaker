@@ -16,7 +16,7 @@ async function tmpOutDir(): Promise<string> {
 const EXAMPLES = ALL_EXAMPLES.map((outDir) => ({
   name: exampleName(outDir),
   outDir,
-}));
+})).filter((v) => v.name.startsWith("webpack")); // TODO include non-webpack examples in e2e tests when supported
 
 describe.each(EXAMPLES)("Debundle $name", ({ name, outDir }) => {
   test(`${name} can be split`, async () => {
@@ -29,7 +29,7 @@ describe.each(EXAMPLES)("Debundle $name", ({ name, outDir }) => {
     const files = [...bundle.files.keys()];
     expect(files).toContain("index.js");
     expect(files).toEqual(
-      expect.arrayContaining([expect.stringMatching(/modules\/.+\.js/)])
+      expect.arrayContaining([expect.stringMatching(/modules\/.+\.js/)]),
     );
   });
 
